@@ -1,0 +1,146 @@
+<!-- Value display above the slider -->
+<div id="slider-value-display" style="text-align: center; margin: 10px 0; font-size: 18px; font-weight: bold; color: #333;">
+    Rating: <span id="current-value">{{ params.start_value }}</span>
+</div>
+
+<script>
+    console.log("=== SLIDER DEBUG: Template loaded ===");
+
+    // Function to update the displayed value
+    function updateSliderValue() {
+        console.log("=== SLIDER DEBUG: updateSliderValue called ===");
+        const slider = document.getElementById('{{ params.slider_id }}');
+        const valueDisplay = document.getElementById('current-value');
+
+        console.log("Slider element:", slider);
+        console.log("Value display element:", valueDisplay);
+
+        if (slider && valueDisplay) {
+            const currentValue = Math.round(parseFloat(slider.value) * 10) / 10;
+            console.log("Current slider value:", slider.value, "-> Rounded:", currentValue);
+            valueDisplay.textContent = currentValue;
+        } else {
+            console.log("ERROR: Could not find slider or value display element");
+        }
+    }
+
+    // Check what slider functions exist
+    function checkSliderFunctions() {
+        console.log("=== SLIDER DEBUG: Available functions ===");
+        console.log("window.sliderOnInput:", typeof window.sliderOnInput);
+        console.log("window.sliderOnChange:", typeof window.sliderOnChange);
+        console.log("All window properties containing 'slider':",
+            Object.getOwnPropertyNames(window).filter(name => name.toLowerCase().includes('slider'))
+        );
+    }
+
+    // Try multiple approaches to hook into slider events
+
+    // Approach 1: Direct event listeners
+    function setupDirectListeners() {
+        console.log("=== SLIDER DEBUG: Setting up direct listeners ===");
+        const slider = document.getElementById('{{ params.slider_id }}');
+        if (slider) {
+            slider.addEventListener('input', function() {
+                console.log("Direct input event fired");
+                updateSliderValue();
+            });
+            slider.addEventListener('change', function() {
+                console.log("Direct change event fired");
+                updateSliderValue();
+            });
+            console.log("Direct listeners added successfully");
+        } else {
+            console.log("ERROR: Slider not found for direct listeners");
+        }
+    }
+
+    // Approach 2: Hook into existing functions (with safety checks)
+    function hookExistingFunctions() {
+        console.log("=== SLIDER DEBUG: Attempting to hook existing functions ===");
+
+        // Store original functions if they exist
+        const originalSliderOnInput = window.sliderOnInput;
+        const originalSliderOnChange = window.sliderOnChange;
+
+        // Override sliderOnInput
+        window.sliderOnInput = function() {
+            console.log("Hooked sliderOnInput called");
+            if (typeof originalSliderOnInput === 'function') {
+                originalSliderOnInput();
+            }
+            updateSliderValue();
+        };
+
+        // Override sliderOnChange
+        window.sliderOnChange = function() {
+            console.log("Hooked sliderOnChange called");
+            if (typeof originalSliderOnChange === 'function') {
+                originalSliderOnChange();
+            }
+            updateSliderValue();
+        };
+
+        console.log("Function hooks installed");
+    }
+
+    // Approach 3: Use PsyNet events
+    function setupPsyNetEvents() {
+        console.log("=== SLIDER DEBUG: Setting up PsyNet events ===");
+
+        // Check if psynet exists
+        if (typeof psynet !== 'undefined' && psynet.trial) {
+            psynet.trial.onEvent("trialPrepare", function() {
+                console.log("PsyNet trialPrepare event fired");
+                updateSliderValue();
+                setupDirectListeners();
+            });
+
+            psynet.trial.onEvent("trialConstruct", function() {
+                console.log("PsyNet trialConstruct event fired");
+                updateSliderValue();
+                checkSliderFunctions();
+                hookExistingFunctions();
+            });
+
+            console.log("PsyNet event listeners added");
+        } else {
+            console.log("ERROR: PsyNet not available");
+        }
+    }
+
+    // Initialize everything
+    console.log("=== SLIDER DEBUG: Starting initialization ===");
+
+    // Run immediately
+    setTimeout(function() {
+        console.log("=== SLIDER DEBUG: Delayed initialization (100ms) ===");
+        checkSliderFunctions();
+        updateSliderValue();
+        setupDirectListeners();
+        hookExistingFunctions();
+    }, 100);
+
+    // Also run when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("=== SLIDER DEBUG: DOM Content Loaded ===");
+            checkSliderFunctions();
+            updateSliderValue();
+            setupDirectListeners();
+            hookExistingFunctions();
+        });
+    }
+
+    // Set up PsyNet events
+    setupPsyNetEvents();
+
+    // Fallback: Try again after a longer delay
+    setTimeout(function() {
+        console.log("=== SLIDER DEBUG: Final fallback (1000ms) ===");
+        checkSliderFunctions();
+        updateSliderValue();
+        setupDirectListeners();
+        hookExistingFunctions();
+    }, 1000);
+</script>

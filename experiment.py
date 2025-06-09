@@ -222,7 +222,8 @@ class CompareTrial(StaticTrial):
             "compare_diagrams",
             ImagePrompt(
                 asset,
-                "Which diagram is the prettiest among the three, in your opinion?",
+                Markup(
+                    "<div style='text-align: center; margin: 1em;'>Which diagram is the prettiest among the three, in your opinion?</div>"),
                 width=900,
                 height=300,
             ),
@@ -257,9 +258,10 @@ class RateTrial(StaticTrial):
             # ),
             SliderControl(
                 start_value=5,
-                min_value=1,
+                min_value=0,
                 max_value=10,
-                slider_id="slider"
+                slider_id="slider",
+                template_filename="slider_value.html"
             ),
             bot_response=np.random.uniform(1, 10),
         )
