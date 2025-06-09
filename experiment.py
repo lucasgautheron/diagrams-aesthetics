@@ -17,7 +17,7 @@ from psynet.trial.static import StaticNode, StaticTrialMaker, StaticTrial
 from psynet.page import InfoPage, SuccessfulEndPage
 from psynet.consent import MainConsent
 
-from psynet.asset import CachedAsset
+from psynet.asset import CachedAsset, LocalStorage, S3Storage
 
 from markupsafe import Markup
 
@@ -407,6 +407,8 @@ survey = ModularPage(
 
 class Exp(psynet.experiment.Experiment):
     label = "Pretty diagrams"
+    asset_storage = LocalStorage("assets")
+    # asset_storage = S3Storage("psynet-tests", "diagrams-aesthetics")
 
     timeline = Timeline(
         MainConsent(),
