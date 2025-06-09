@@ -197,7 +197,7 @@ class ExpertiseTrial(StaticTrial):
             "classify_diagram",
             ImagePrompt(
                 asset,
-                f"Can you guess the title of the article from which this diagram was extracted?'",
+                Markup("<div style='text-align: center; margin: 1em;'>Can you guess the title of the article from which this diagram was extracted?</div>"),
                 width=350,
                 height=350,
             ),
@@ -431,7 +431,7 @@ class Exp(psynet.experiment.Experiment):
         SuccessfulEndPage(),
     )
 
-    test_n_bots = 3
+    test_n_bots = 10
 
     def test_check_bot(self, bot: Bot, **kwargs):
         assert not bot.failed
