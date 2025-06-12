@@ -27,7 +27,13 @@ from os.path import basename
 import pandas as pd
 import numpy as np
 
+import json
+
 from typing import List
+
+MODE = "HOTAIR"
+
+assert MODE in ["HOTAIR", "PROLIFIC"]
 
 N_EXPERTISE_TRIALS = 3
 N_EXPERTISE_NODES = 50
@@ -335,6 +341,7 @@ aesthetic_comparison_trial = AestheticTrialMaker(
     recruit_mode="n_participants",
     allow_repeated_nodes=False,
     balance_across_nodes=False,
+    n_repeat_trials=3
 )
 
 aesthetic_rating_trial = AestheticTrialMaker(
@@ -348,6 +355,7 @@ aesthetic_rating_trial = AestheticTrialMaker(
     recruit_mode="n_participants",
     allow_repeated_nodes=False,
     balance_across_nodes=False,
+    n_repeat_trials=3
 )
 
 survey = ModularPage(
@@ -405,10 +413,53 @@ survey = ModularPage(
 )
 
 
+def _(s):
+    return s
+
+def get_prolific_settings():
+    with open("pt_prolific_en.json", "r") as f:
+        qualification = json.dumps(json.load(f))
+    return {
+        "recruiter": "prolific",
+        "base_payment": 2.12,
+        "prolific_estimated_completion_minutes": 15,
+        "prolific_recruitment_config": qualification,
+        "auto_recruit": False,
+        "wage_per_hour": 0,
+        "currency": "£",
+        "show_reward": False,
+    }
+recruiter_settings = get_prolific_settings()
+
 class Exp(psynet.experiment.Experiment):
     label = "Pretty diagrams"
-    asset_storage = LocalStorage("assets")
+    asset_storage = LocalStorage()
+    # asset_storage = LocalStorage("assets")
     # asset_storage = S3Storage("psynet-tests", "diagrams-aesthetics")
+
+
+    config = {
+        "recruiter": MODE.lower(),
+        "wage_per_hour": 9,
+        # "publish_experiment": False,
+        "title": _(
+            "Pretty diagrams (Chrome browser, ~15 minutes to complete, ~2pounds)"),
+
+        "description": " ".join([
+            _("This experiment requires you to rate images (scientific diagrams) according to how pretty you find them."),
+            _("We recommend opening the experiment in an incognito window in Chrome, as some browser add-ons can interfere with the experiment."),
+            _("If you have any questions or concerns, please contact us through Prolific.")
+        ]),
+
+        'initial_recruitment_size': 10,
+        "auto_recruit": False,
+        "show_reward": False,
+        "contact_email_on_error": "lucas.gautheron@gmail.com",
+        "organization_name": "Max Planck Institute for Empirical Aesthetics"
+    }
+
+    if MODE == "PROLIFIC":
+        config.update(**recruiter_settings)
 
     timeline = Timeline(
         MainConsent(),
