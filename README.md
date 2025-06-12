@@ -12,12 +12,12 @@ For more information about PsyNet, see the [documentation website](https://psyne
 
 ## Task 1 - Adaptive expertise assessment
 
-![](docs/task1.png)
+![](static/images/task1.png)
 
 ## Task 2 - Subjective comparison
 
-![](docs/task2.png)
+![](static/images/task2.png)
 
 ## Task 3 - Subjective rating
 
-![](docs/task3.png)
+![](static/images/task3.png)

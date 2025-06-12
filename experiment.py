@@ -31,72 +31,19 @@ import json
 
 from typing import List
 
+DEBUG = True
 MODE = "HOTAIR"
-
-assert MODE in ["HOTAIR", "PROLIFIC"]
 
 N_EXPERTISE_TRIALS = 3
 N_EXPERTISE_NODES = 50
 
-N_TARGET_TRIPLETS_PER_PARTICIPANTS = 150
-N_MAX_TRIPLETS_PER_PARTICIPANTS = 150
+N_TARGET_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 150
+N_MAX_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 150
 N_TRIALS_PER_TRIPLET = 5
 
-N_TARGET_RATINGS_PER_PARTICIPANTS = 50
-N_MAX_RATINGS_PER_PARTICIPANTS = 50
+N_TARGET_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 50
+N_MAX_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 50
 N_TRIALS_PER_RATING = 5
-
-
-def thompson_sampling(nodes: List[psynet.trial.static.StaticNode]) -> int:
-    """Retrieve an informative expertise-assessment task
-    by performing online Thompson sampling.
-    The reward associated with a task
-    is the F-score of the prediction of experts vs non-experts,
-    based on prior participants' answers.
-
-    Args:
-        nodes (List[psynet.trial.static.StaticNode]): candidate nodes
-
-    Returns:
-        int: id of the selected node
-    """
-    alpha_prior = 1
-    beta_prior = 1
-
-    successes, failures = (
-        {False: dict(), True: dict()},
-        {False: dict(), True: dict()},
-    )
-    rewards = dict()
-
-    for node in nodes:
-        for trial in node.viable_trials:
-            if trial.var.expert_status is None:
-                continue
-
-            is_expert = trial.var.expert_status
-
-            if trial.var.successful_prediction == True:
-                successes[is_expert][node.id] = successes[is_expert].get(node.id, 0) + 1
-            elif trial.var.successful_prediction == False:
-                failures[is_expert][node.id] = failures[is_expert].get(node.id, 0) + 1
-
-        accuracy = np.zeros(2)
-        for is_expert in [False, True]:
-            accuracy[1 if is_expert else 0] = np.random.beta(
-                alpha_prior + successes[is_expert].get(node.id, 0),
-                beta_prior + failures[is_expert].get(node.id, 0),
-            )
-
-        # F-score
-        rewards[node.id] = 2 * np.prod(accuracy) / np.sum(accuracy)
-
-    best_node = sorted(
-        list(rewards.keys()),
-        key=lambda node: rewards[node],
-        reverse=True,
-    )[0]
-    return best_node
 
 
 def build_aesthetic_comparison_nodes():
@@ -203,7 +150,8 @@ class ExpertiseTrial(StaticTrial):
             "classify_diagram",
             ImagePrompt(
                 asset,
-                Markup("<div style='text-align: center; margin: 1em;'>Can you guess the title of the article from which this diagram was extracted?</div>"),
+                Markup(
+                    "<div style='text-align: center; margin: 1em;'>Can you guess the title of the article from which this diagram was extracted?</div>"),
                 width=350,
                 height=350,
             ),
@@ -279,7 +227,7 @@ class ExpertiseTrialMaker(StaticTrialMaker):
         for candidate in candidates:
             nodes += candidate.nodes()
 
-        next_node_id = thompson_sampling(nodes)
+        next_node_id = ExpertiseTrialMaker.thompson_sampling(nodes)
 
         for candidate in candidates:
             if any([node.id == next_node_id for node in candidate.nodes()]):
@@ -309,6 +257,58 @@ class ExpertiseTrialMaker(StaticTrialMaker):
         trial.var.expert_status = expert
 
         super().finalize_trial(answer, trial, experiment, participant)
+
+    @staticmethod
+    def thompson_sampling(nodes: List[psynet.trial.static.StaticNode]) -> int:
+        """Retrieve an informative expertise-assessment task
+        by performing online Thompson sampling.
+        The reward associated with a task
+        is the F-score of the prediction of experts vs non-experts,
+        based on prior participants' answers.
+
+        Args:
+            nodes (List[psynet.trial.static.StaticNode]): candidate nodes
+
+        Returns:
+            int: id of the selected node
+        """
+        alpha_prior = 1
+        beta_prior = 1
+
+        successes, failures = (
+            {False: dict(), True: dict()},
+            {False: dict(), True: dict()},
+        )
+        rewards = dict()
+
+        for node in nodes:
+            for trial in node.viable_trials:
+                if trial.var.expert_status is None:
+                    continue
+
+                is_expert = trial.var.expert_status
+
+                if trial.var.successful_prediction == True:
+                    successes[is_expert][node.id] = successes[is_expert].get(node.id, 0) + 1
+                elif trial.var.successful_prediction == False:
+                    failures[is_expert][node.id] = failures[is_expert].get(node.id, 0) + 1
+
+            accuracy = np.zeros(2)
+            for is_expert in [False, True]:
+                accuracy[1 if is_expert else 0] = np.random.beta(
+                    alpha_prior + successes[is_expert].get(node.id, 0),
+                    beta_prior + failures[is_expert].get(node.id, 0),
+                )
+
+            # F-score
+            rewards[node.id] = 2 * np.prod(accuracy) / np.sum(accuracy)
+
+        best_node = sorted(
+            list(rewards.keys()),
+            key=lambda node: rewards[node],
+            reverse=True,
+        )[0]
+        return best_node
 
 
 expertise_trial = ExpertiseTrialMaker(
@@ -416,6 +416,7 @@ survey = ModularPage(
 def _(s):
     return s
 
+
 def get_prolific_settings():
     with open("pt_prolific_en.json", "r") as f:
         qualification = json.dumps(json.load(f))
@@ -429,7 +430,12 @@ def get_prolific_settings():
         "currency": "£",
         "show_reward": False,
     }
+
+
 recruiter_settings = get_prolific_settings()
+
+assert MODE in ["HOTAIR", "PROLIFIC"]
+
 
 class Exp(psynet.experiment.Experiment):
     label = "Pretty diagrams"
@@ -437,9 +443,8 @@ class Exp(psynet.experiment.Experiment):
     # asset_storage = LocalStorage("assets")
     # asset_storage = S3Storage("psynet-tests", "diagrams-aesthetics")
 
-
     config = {
-        "recruiter": MODE.lower(),
+        # "recruiter": MODE.lower(),
         "wage_per_hour": 9,
         # "publish_experiment": False,
         "title": _(
@@ -466,19 +471,30 @@ class Exp(psynet.experiment.Experiment):
         survey,
         InfoPage(
             Markup(
-                "Before we begin, let us try to assess your familiarity with the scientific domain in question very briefly."
+                f"<div align='center' style='margin: 10px;'>Before we begin, let us try to assess your familiarity with the scientific domain in question very briefly!</div>"
+                f"<div align='center' style='margin: 10px;'>You will be presented with a series of diagrams. For each diagram, you will have to guess the title of the scientific publication from which they originate, among multiple choices.</div>"
+                f"<div align='center' style='margin: 10px;'>If you have no idea, you may say 'I don't know'. There is no reward for being right or penalty wrong!</div>"
+                f"<div align='center' style='border: 2px black; margin: 10px;'><img src='/static/images/task1.png' width='480' /></div>"
             ),
-            time_estimate=1,
+            time_estimate=3,
         ),
         expertise_trial,
         InfoPage(
-            Markup("Fantastic, we can now start the aesthetic judgment task!"), time_estimate=1
+            Markup(
+                "<div align='center' style='margin: 10px;'>Fantastic, we can now start the aesthetic judgment task!</div>"
+                f"<div align='center' style='margin: 10px;'>You will be presented with a series of triplets of diagrams. For each triplet, you will have to pick the diagram that you find prettier.</div>"
+                f"<div align='center' style='border: 2px black; margin: 10px;'><img src='/static/images/task2.png' width='480' /></div>"
+            ),
+            time_estimate=3
         ),
         aesthetic_comparison_trial,
         InfoPage(
             Markup(
-                "Thank you! Let us finish with a slightly different task, assessing your aesthetic preferences in an other way."),
-            time_estimate=1
+                "<div align='center' style='margin: 10px;'>Thank you! Let us finish with a slightly different task, assessing your aesthetic preferences in an other way.</div>"
+                f"<div align='center' style='margin: 10px;'>You will be presented with a series of diagrams. Rate each diagram from 0 (ugliest) to 10 (prettiest).</div>"
+                f"<div align='center' style='border: 2px black; margin: 10px;'><img src='/static/images/task3.png' width='480' /></div>"
+            ),
+            time_estimate=3
         ),
         aesthetic_rating_trial,
         SuccessfulEndPage(),
