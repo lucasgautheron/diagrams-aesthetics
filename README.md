@@ -11,7 +11,7 @@ The experiment features three tasks:
 
 # Task Comparison
 
-| Aspect                       | Task 1                                               | Task 2                             |
+| Aspect                       | Task 2 (Comparisons)                                 | Task 3 (Direct rating)             |
 |------------------------------|------------------------------------------------------|------------------------------------|
 | **# Images**                 | 3,000 images                                         | 3,000 images                       |
 | **# Nodes**                  | 6,000 triplets                                       | 3,000 images                       |
