@@ -31,7 +31,7 @@ import json
 
 from typing import List
 
-DEBUG = True
+DEBUG = False
 MODE = "HOTAIR"
 
 N_EXPERTISE_TRIALS = 3
@@ -47,10 +47,7 @@ N_TRIALS_PER_RATING = 5
 
 
 class ExpertiseNode(ChainNode):
-    def summarize_trials(self, trials: list, experiment, participant):
-        answers = np.array([trial.answer["reproduce"] for trial in trials])
-        print(answers)
-        return trials
+    pass
 
 
 class ExpertiseTrial(StaticTrial):
@@ -84,63 +81,6 @@ class ExpertiseTrial(StaticTrial):
                 name="title_guess",
             ),
             bot_response=np.random.choice(choices + ["unknown"]),
-        )
-
-
-class CompareTrial(StaticTrial):
-    time_estimate = 3
-
-    def show_trial(self, experiment, participant):
-        asset = self.assets["stimulus"]
-
-        choices = [0, 1, 2]
-
-        return ModularPage(
-            "compare_diagrams",
-            ImagePrompt(
-                asset,
-                Markup(
-                    "<div style='text-align: center; margin: 1em;'>Which diagram is the prettiest among the three, in your opinion?</div>"),
-                width=900,
-                height=300,
-            ),
-            PushButtonControl(
-                choices=choices,
-                labels=["Left diagram", "Middle diagram", "Right diagram"],
-                arrange_vertically=False,
-            ),
-            bot_response=np.random.choice(choices),
-        )
-
-
-class RateTrial(StaticTrial):
-    time_estimate = 3
-
-    def show_trial(self, experiment, participant):
-        asset = self.assets["stimulus"]
-
-        return ModularPage(
-            "rate_diagrams",
-            ImagePrompt(
-                asset,
-                Markup(
-                    "<div style='text-align: center; margin: 1em;'>Please rate the diagram aesthetically on a scale from left (ugliest) to right (prettiest).</div>"),
-                width=350,
-                height=350,
-            ),
-            # PushButtonControl(
-            #     choices=np.arange(10) + 1,
-            #     labels=list(np.arange(10) + 1),
-            #     arrange_vertically=False,
-            # ),
-            SliderControl(
-                start_value=5,
-                min_value=0,
-                max_value=10,
-                slider_id="slider",
-                template_filename="slider_value.html"
-            ),
-            bot_response=np.random.uniform(1, 10),
         )
 
 
@@ -254,6 +194,32 @@ class ExpertiseTrialMaker(StaticTrialMaker):
         return best_node
 
 
+class CompareTrial(StaticTrial):
+    time_estimate = 3
+
+    def show_trial(self, experiment, participant):
+        asset = self.assets["stimulus"]
+
+        choices = [0, 1, 2]
+
+        return ModularPage(
+            "compare_diagrams",
+            ImagePrompt(
+                asset,
+                Markup(
+                    "<div style='text-align: center; margin: 1em;'>Which diagram is the prettiest among the three, in your opinion?</div>"),
+                width=900,
+                height=300,
+            ),
+            PushButtonControl(
+                choices=choices,
+                labels=["Left diagram", "Middle diagram", "Right diagram"],
+                arrange_vertically=False,
+            ),
+            bot_response=np.random.choice(choices),
+        )
+
+
 class AestheticComparisonTrialMaker(StaticTrialMaker):
     def __init__(self, *args, **kwargs):
         triplets_locations = [
@@ -283,6 +249,37 @@ class AestheticComparisonTrialMaker(StaticTrialMaker):
 
     def choose_block_order(self, experiment, participant, blocks):
         return sorted(blocks)
+
+
+class RateTrial(StaticTrial):
+    time_estimate = 3
+
+    def show_trial(self, experiment, participant):
+        asset = self.assets["stimulus"]
+
+        return ModularPage(
+            "rate_diagrams",
+            ImagePrompt(
+                asset,
+                Markup(
+                    "<div style='text-align: center; margin: 1em;'>Please rate the diagram aesthetically on a scale from left (ugliest) to right (prettiest).</div>"),
+                width=350,
+                height=350,
+            ),
+            # PushButtonControl(
+            #     choices=np.arange(10) + 1,
+            #     labels=list(np.arange(10) + 1),
+            #     arrange_vertically=False,
+            # ),
+            SliderControl(
+                start_value=5,
+                min_value=0,
+                max_value=10,
+                slider_id="slider",
+                template_filename="slider_value.html"
+            ),
+            bot_response=np.random.uniform(1, 10),
+        )
 
 
 class AestheticRatingTrialMaker(StaticTrialMaker):
