@@ -37,64 +37,13 @@ MODE = "HOTAIR"
 N_EXPERTISE_TRIALS = 3
 N_EXPERTISE_NODES = 50
 
-N_TARGET_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 150
-N_MAX_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 150
+N_TARGET_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 125
+N_MAX_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 125
 N_TRIALS_PER_TRIPLET = 5
 
-N_TARGET_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 50
-N_MAX_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 50
+N_TARGET_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 75
+N_MAX_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 75
 N_TRIALS_PER_RATING = 5
-
-
-def build_aesthetic_comparison_nodes():
-    triplets_locations = [
-        "/Users/lucasgautheron/Documents/cs/tasks/clip",
-        "/Users/lucasgautheron/Documents/cs/tasks/random"
-    ]
-
-    for block, location in enumerate(triplets_locations):
-        images = [f"{location}/{f}" for f in listdir(location) if f.endswith(".png")]
-
-        nodes = [
-            StaticNode(
-                definition={
-                    "id": basename(image),
-                    "hashes": basename(image).split(".")[0].split("_"),
-                },
-                assets={
-                    "stimulus": CachedAsset(image),
-                },
-                block=f"{block}",
-            )
-            for image in images
-        ]
-
-    return nodes
-
-
-def build_aesthetic_rating_nodes():
-    triplets_locations = [
-        "/Users/lucasgautheron/Documents/cs/tasks/rating1",
-    ]
-
-    for block, location in enumerate(triplets_locations):
-        images = [f"{location}/{f}" for f in listdir(location) if f.endswith(".png")]
-
-        nodes = [
-            StaticNode(
-                definition={
-                    "id": basename(image),
-                    "hash": basename(image).split(".")[0],
-                },
-                assets={
-                    "stimulus": CachedAsset(image),
-                },
-                block=f"{block}",
-            )
-            for image in images
-        ]
-
-    return nodes
 
 
 class ExpertiseNode(ChainNode):
@@ -102,32 +51,6 @@ class ExpertiseNode(ChainNode):
         answers = np.array([trial.answer["reproduce"] for trial in trials])
         print(answers)
         return trials
-
-
-def build_expertise_nodes(n: int):
-    triplets_location = "/Users/lucasgautheron/Documents/cs/tasks/guess-image-title/"
-    tasks = pd.read_csv(
-        "/Users/lucasgautheron/Documents/cs/tasks/guess-image-title.csv"
-    ).head(n)
-
-    nodes = [
-        ExpertiseNode(
-            definition={
-                "id": task["image"],
-                "title": task["target_title"],
-                "choices": [task[f"choice_{i}"] for i in range(task["num_choices"])],
-            },
-            assets={"stimulus": CachedAsset(f"{triplets_location}/{task['image']}")},
-        )
-        for task in tasks.to_dict(orient="records")
-    ]
-
-    return nodes
-
-
-aesthetic_comparison_nodes = build_aesthetic_comparison_nodes()
-aesthetic_rating_nodes = build_aesthetic_rating_nodes()
-expertise_nodes = build_expertise_nodes(N_EXPERTISE_NODES)
 
 
 class ExpertiseTrial(StaticTrial):
@@ -222,6 +145,26 @@ class RateTrial(StaticTrial):
 
 
 class ExpertiseTrialMaker(StaticTrialMaker):
+    def __init__(self, *args, n_nodes, **kwargs):
+        triplets_location = "/Users/lucasgautheron/Documents/cs/tasks/guess-image-title/"
+        tasks = pd.read_csv(
+            "/Users/lucasgautheron/Documents/cs/tasks/guess-image-title.csv"
+        ).head(n_nodes)
+
+        nodes = [
+            ExpertiseNode(
+                definition={
+                    "id": task["image"],
+                    "title": task["target_title"],
+                    "choices": [task[f"choice_{i}"] for i in range(task["num_choices"])],
+                },
+                assets={"stimulus": CachedAsset(f"{triplets_location}/{task['image']}")},
+            )
+            for task in tasks.to_dict(orient="records")
+        ]
+
+        super().__init__(*args, **kwargs, nodes=nodes)
+
     def custom_network_filter(self, candidates, participant):
         nodes = []
         for candidate in candidates:
@@ -311,10 +254,71 @@ class ExpertiseTrialMaker(StaticTrialMaker):
         return best_node
 
 
+class AestheticComparisonTrialMaker(StaticTrialMaker):
+    def __init__(self, *args, **kwargs):
+        triplets_locations = [
+            "/Users/lucasgautheron/Documents/cs/tasks/clip",
+            "/Users/lucasgautheron/Documents/cs/tasks/random"
+        ]
+
+        nodes = []
+        for block, location in enumerate(triplets_locations):
+            images = [f"{location}/{f}" for f in listdir(location) if f.endswith(".png")]
+
+            nodes += [
+                StaticNode(
+                    definition={
+                        "id": basename(image),
+                        "hashes": basename(image).split(".")[0].split("_"),
+                    },
+                    assets={
+                        "stimulus": CachedAsset(image),
+                    },
+                    block=f"{block}",
+                )
+                for image in images
+            ]
+
+        super().__init__(*args, **kwargs, nodes=nodes)
+
+    def choose_block_order(self, experiment, participant, blocks):
+        return sorted(blocks)
+
+
+class AestheticRatingTrialMaker(StaticTrialMaker):
+    def __init__(self, *args, **kwargs):
+        triplets_locations = [
+            "/Users/lucasgautheron/Documents/cs/tasks/rating1",
+        ]
+
+        nodes = []
+        for block, location in enumerate(triplets_locations):
+            images = [f"{location}/{f}" for f in listdir(location) if f.endswith(".png")]
+
+            nodes += [
+                StaticNode(
+                    definition={
+                        "id": basename(image),
+                        "hash": basename(image).split(".")[0],
+                    },
+                    assets={
+                        "stimulus": CachedAsset(image),
+                    },
+                    block=f"{block}",
+                )
+                for image in images
+            ]
+
+        super().__init__(*args, **kwargs, nodes=nodes)
+
+    def choose_block_order(self, experiment, participant, blocks):
+        return sorted(blocks)
+
+
 expertise_trial = ExpertiseTrialMaker(
     id_="expertise_trial",
     trial_class=ExpertiseTrial,
-    nodes=expertise_nodes,
+    n_nodes=N_EXPERTISE_NODES,
     expected_trials_per_participant=N_EXPERTISE_TRIALS,
     max_trials_per_participant=N_EXPERTISE_TRIALS,
     target_trials_per_node=None,
@@ -324,16 +328,9 @@ expertise_trial = ExpertiseTrialMaker(
     balance_across_nodes=False,
 )
 
-
-class AestheticTrialMaker(StaticTrialMaker):
-    def choose_block_order(self, experiment, participant, blocks):
-        return sorted(blocks)
-
-
-aesthetic_comparison_trial = AestheticTrialMaker(
+aesthetic_comparison_trial = AestheticComparisonTrialMaker(
     id_="aesthetic_comparison_trial",
     trial_class=CompareTrial,
-    nodes=aesthetic_comparison_nodes,
     expected_trials_per_participant=N_TARGET_TRIPLETS_PER_PARTICIPANTS,
     max_trials_per_participant=N_MAX_TRIPLETS_PER_PARTICIPANTS,
     target_trials_per_node=N_TRIALS_PER_TRIPLET,
@@ -344,10 +341,9 @@ aesthetic_comparison_trial = AestheticTrialMaker(
     n_repeat_trials=3
 )
 
-aesthetic_rating_trial = AestheticTrialMaker(
+aesthetic_rating_trial = AestheticRatingTrialMaker(
     id_="aesthetic_rating_trial",
     trial_class=RateTrial,
-    nodes=aesthetic_rating_nodes,
     expected_trials_per_participant=N_TARGET_RATINGS_PER_PARTICIPANTS,
     max_trials_per_participant=N_MAX_RATINGS_PER_PARTICIPANTS,
     target_trials_per_node=N_TRIALS_PER_RATING,
@@ -432,9 +428,25 @@ def get_prolific_settings():
     }
 
 
-recruiter_settings = get_prolific_settings()
+def get_cap_settings():
+    raise {
+        "wage_per_hour": 12
+    }
 
-assert MODE in ["HOTAIR", "PROLIFIC"]
+
+assert MODE in ["HOTAIR", "PROLIFIC", "CAP"]
+
+recruiters = {
+    "HOTAIR": "hotair",
+    "PROLIFIC": "prolific",
+    "CAP": "cap-recruiter",
+}
+
+recruiter_settings = None
+if MODE == "PROLIFIC":
+    recruiter_settings = get_prolific_settings()
+elif MODE == "CAP":
+    recruiter_settings = get_cap_settings()
 
 
 class Exp(psynet.experiment.Experiment):
@@ -444,8 +456,8 @@ class Exp(psynet.experiment.Experiment):
     # asset_storage = S3Storage("psynet-tests", "diagrams-aesthetics")
 
     config = {
-        # "recruiter": MODE.lower(),
-        "wage_per_hour": 9,
+        "recruiter": recruiters[MODE],
+        "wage_per_hour": 0,
         # "publish_experiment": False,
         "title": _(
             "Pretty diagrams (Chrome browser, ~15 minutes to complete, ~2pounds)"),
@@ -463,7 +475,7 @@ class Exp(psynet.experiment.Experiment):
         "organization_name": "Max Planck Institute for Empirical Aesthetics"
     }
 
-    if MODE == "PROLIFIC":
+    if MODE != "HOTAIR":
         config.update(**recruiter_settings)
 
     timeline = Timeline(
@@ -471,30 +483,33 @@ class Exp(psynet.experiment.Experiment):
         survey,
         InfoPage(
             Markup(
-                f"<div align='center' style='margin: 10px;'>Before we begin, let us try to assess your familiarity with the scientific domain in question very briefly!</div>"
-                f"<div align='center' style='margin: 10px;'>You will be presented with a series of diagrams. For each diagram, you will have to guess the title of the scientific publication from which they originate, among multiple choices.</div>"
-                f"<div align='center' style='margin: 10px;'>If you have no idea, you may say 'I don't know'. There is no reward for being right or penalty wrong!</div>"
-                f"<div align='center' style='border: 2px black; margin: 10px;'><img src='/static/images/task1.png' width='480' /></div>"
+                f"<h3>Before we begin...</h3>"
+                f"<div style='margin: 10px;'>Before we begin, let us try to assess your familiarity with the scientific domain in question very briefly!</div>"
+                f"<div style='margin: 10px;'>You will be presented with a series of diagrams. For each diagram, you will have to guess the title of the scientific publication from which they originate, among multiple choices.</div>"
+                f"<div style='margin: 10px;'>If you have no idea, you may say 'I don't know'. There is no reward or penalty for being right or wrong!</div>"
+                f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task1.png' width='480' /></div>"
             ),
-            time_estimate=3,
+            time_estimate=5,
         ),
         expertise_trial,
         InfoPage(
             Markup(
-                "<div align='center' style='margin: 10px;'>Fantastic, we can now start the aesthetic judgment task!</div>"
-                f"<div align='center' style='margin: 10px;'>You will be presented with a series of triplets of diagrams. For each triplet, you will have to pick the diagram that you find prettier.</div>"
-                f"<div align='center' style='border: 2px black; margin: 10px;'><img src='/static/images/task2.png' width='480' /></div>"
+                f"<h3>Compare diagrams!</h3>"
+                f"<div style='margin: 10px;'>Fantastic, we can now start the aesthetic judgment task!</div>"
+                f"<div style='margin: 10px;'>You will be presented with a series of triplets of diagrams. For each triplet, you will have to pick the diagram that you find prettier.</div>"
+                f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task2.png' width='480' /></div>"
             ),
-            time_estimate=3
+            time_estimate=5
         ),
         aesthetic_comparison_trial,
         InfoPage(
             Markup(
-                "<div align='center' style='margin: 10px;'>Thank you! Let us finish with a slightly different task, assessing your aesthetic preferences in an other way.</div>"
-                f"<div align='center' style='margin: 10px;'>You will be presented with a series of diagrams. Rate each diagram from 0 (ugliest) to 10 (prettiest).</div>"
-                f"<div align='center' style='border: 2px black; margin: 10px;'><img src='/static/images/task3.png' width='480' /></div>"
+                f"<h3>Rate diagrams!</h3>"
+                "<div style='margin: 10px;'>Thank you! Let us finish with a slightly different task, assessing your aesthetic preferences in an other way.</div>"
+                f"<div style='margin: 10px;'>You will be presented with a series of diagrams. Rate each diagram from 0 (ugliest) to 10 (prettiest).</div>"
+                f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task3.png' width='480' /></div>"
             ),
-            time_estimate=3
+            time_estimate=5
         ),
         aesthetic_rating_trial,
         SuccessfulEndPage(),
