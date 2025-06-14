@@ -13,7 +13,7 @@ The experiment features three tasks:
 
 | Aspect                       | Task 1 (Expertise) | Task 2 (Comparisons)                                 | Task 3 (Direct rating)             |
 |------------------------------|--------------------|------------------------------------------------------|------------------------------------|
-| **# Images**                 | 50                 | 3,000 images                                         | 3,000 images                       |
+| **# Images**                 | 50                 | 3,000                                                | 3,000                              |
 | **# Nodes**                  | 50                 | 6,000 triplets                                       | 3,000 images                       |
 | **# Trials**                 |                    | 30,000 total (2x15,000 blocks), 5 trials per triplet | 15,000 total, 5 trials per triplet |
 | **# Trials per Participant** | 3                  | 125 trials                                           | 75 trials                          |
