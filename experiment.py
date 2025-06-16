@@ -1,5 +1,8 @@
 import psynet.experiment
 from psynet.bot import Bot
+from psynet.demography.general import (
+    BasicDemography,
+)
 from psynet.modular_page import (
     ModularPage,
     PushButtonControl,
@@ -10,6 +13,7 @@ from psynet.modular_page import (
     SliderControl,
     HtmlSliderControl
 )
+
 from psynet.timeline import Module, Timeline, Response
 from psynet.trial.chain import ChainNode
 
@@ -371,20 +375,20 @@ survey = ModularPage(
                                 "I am not a scientist",
                             ],
                         },
-                        {
-                            "type": "radiogroup",
-                            "name": "education",
-                            "title": "What is your highest degree?",
-                            "isRequired": "true",
-                            "choices": [
-                                "High-school degree or less",
-                                "BA/BSc or equivalent",
-                                "MA/MSc or equivalent",
-                                "PhD",
-                            ],
-                            "showOtherItem": "true",
-                            "showNoneItem": "true",
-                        },
+                        # {
+                        #     "type": "radiogroup",
+                        #     "name": "education",
+                        #     "title": "What is your highest degree?",
+                        #     "isRequired": "true",
+                        #     "choices": [
+                        #         "High-school degree or less",
+                        #         "BA/BSc or equivalent",
+                        #         "MA/MSc or equivalent",
+                        #         "PhD",
+                        #     ],
+                        #     "showOtherItem": "true",
+                        #     "showNoneItem": "true",
+                        # },
                         {
                             "type": "boolean",
                             "name": "tikz",
@@ -477,6 +481,7 @@ class Exp(psynet.experiment.Experiment):
 
     timeline = Timeline(
         MainConsent(),
+        BasicDemography(),
         survey,
         InfoPage(
             Markup(
