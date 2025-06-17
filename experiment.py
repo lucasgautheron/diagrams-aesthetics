@@ -37,6 +37,7 @@ from typing import List
 
 DEBUG = False
 MODE = "HOTAIR"
+DURATION_ESTIMATE = 15 * 60
 
 N_EXPERTISE_TRIALS = 3
 N_EXPERTISE_NODES = 50
@@ -414,13 +415,14 @@ def _(s):
     return s
 
 
-def get_prolific_settings():
+def get_prolific_settings(experiment_duration):
     with open("pt_prolific_en.json", "r") as f:
         qualification = json.dumps(json.load(f))
+
     return {
         "recruiter": "prolific",
-        "base_payment": 2.12,
-        "prolific_estimated_completion_minutes": 15,
+        "base_payment": 9 * DURATION_ESTIMATE / 60 / 60,
+        "prolific_estimated_completion_minutes": DURATION_ESTIMATE / 60,
         "prolific_recruitment_config": qualification,
         "auto_recruit": False,
         "wage_per_hour": 0,
@@ -429,7 +431,7 @@ def get_prolific_settings():
     }
 
 
-def get_cap_settings():
+def get_cap_settings(experiment_duration):
     raise {
         "wage_per_hour": 12
     }
@@ -445,9 +447,9 @@ recruiters = {
 
 recruiter_settings = None
 if MODE == "PROLIFIC":
-    recruiter_settings = get_prolific_settings()
+    recruiter_settings = get_prolific_settings(DURATION_ESTIMATE)
 elif MODE == "CAP":
-    recruiter_settings = get_cap_settings()
+    recruiter_settings = get_cap_settings(DURATION_ESTIMATE)
 
 
 class Exp(psynet.experiment.Experiment):
