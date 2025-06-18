@@ -376,20 +376,6 @@ survey = ModularPage(
                                 "I am not a scientist",
                             ],
                         },
-                        # {
-                        #     "type": "radiogroup",
-                        #     "name": "education",
-                        #     "title": "What is your highest degree?",
-                        #     "isRequired": "true",
-                        #     "choices": [
-                        #         "High-school degree or less",
-                        #         "BA/BSc or equivalent",
-                        #         "MA/MSc or equivalent",
-                        #         "PhD",
-                        #     ],
-                        #     "showOtherItem": "true",
-                        #     "showNoneItem": "true",
-                        # },
                         {
                             "type": "boolean",
                             "name": "tikz",
