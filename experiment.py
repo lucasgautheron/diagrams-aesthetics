@@ -14,7 +14,7 @@ from psynet.modular_page import (
     HtmlSliderControl
 )
 
-from psynet.timeline import Module, Timeline, Response
+from psynet.timeline import Module, Timeline, Response, Event
 from psynet.trial.chain import ChainNode
 
 from psynet.trial.static import StaticNode, StaticTrialMaker, StaticTrial
@@ -26,24 +26,25 @@ from psynet.asset import CachedAsset, LocalStorage, S3Storage
 from markupsafe import Markup
 
 from os import listdir
-from os.path import basename
+from os.path import basename, splitext
 
 import pandas as pd
 import numpy as np
+import random
 
 import json
 
-from typing import List
+from typing import List, Union, Optional
 
-DEBUG = False
+DEBUG = True
 MODE = "HOTAIR"
 DURATION_ESTIMATE = 15 * 60
 
 N_EXPERTISE_TRIALS = 3
 N_EXPERTISE_NODES = 50
 
-N_TARGET_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 125
-N_MAX_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 125
+N_TARGET_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 150
+N_MAX_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 150
 N_TRIALS_PER_TRIPLET = 5
 
 N_TARGET_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 75
@@ -199,21 +200,73 @@ class ExpertiseTrialMaker(StaticTrialMaker):
         return best_node
 
 
+class AestheticComparisonPrompt(Prompt):
+    def __init__(
+            self,
+            assets: List[CachedAsset],
+            text: Union[str, Markup],
+            width: str,
+            height: str,
+            show_after: float = 0.0,
+            hide_after: Optional[float] = None,
+            margin_top: str = "0px",
+            margin_bottom: str = "0px",
+            text_align: str = "left",
+    ):
+        super().__init__(text=text, text_align=text_align)
+
+        self.urls = [asset.url for asset in assets]
+        self.width = width
+        self.height = height
+        self.show_after = show_after
+        self.hide_after = hide_after
+        self.margin_top = margin_top
+        self.margin_bottom = margin_bottom
+
+    macro = "comparison"
+    external_template = "aesthetic-comparison.html"
+
+    @property
+    def metadata(self):
+        return {
+            "text": str(self.text),
+            "urls": self.urls,
+            "show_after": self.show_after,
+            "hide_after": self.hide_after,
+        }
+
+    def update_events(self, events):
+        events["promptStart"] = Event(
+            is_triggered_by="trialStart", delay=self.show_after
+        )
+
+        if self.hide_after is not None:
+            events["promptEnd"] = Event(
+                is_triggered_by="promptStart", delay=self.hide_after
+            )
+
+
 class CompareTrial(StaticTrial):
     time_estimate = 3
 
-    def show_trial(self, experiment, participant):
-        asset = self.assets["stimulus"]
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        hashes = self.definition["hashes"].copy()
+        random.shuffle(hashes)
+        self.var.hashes = hashes
 
-        choices = [0, 1, 2]
+    def show_trial(self, experiment, participant):
+        hashes = self.var.hashes
+        assets = [self.assets[hash] for hash in hashes]
+        choices = self.var.hashes
 
         return ModularPage(
             "compare_diagrams",
-            ImagePrompt(
-                asset,
+            AestheticComparisonPrompt(
+                assets,
                 Markup(
                     "<div style='text-align: center; margin: 1em;'>Which diagram is the prettiest among the three, in your opinion?</div>"),
-                width=900,
+                width=300,
                 height=300,
             ),
             PushButtonControl(
@@ -228,26 +281,28 @@ class CompareTrial(StaticTrial):
 class AestheticComparisonTrialMaker(StaticTrialMaker):
     def __init__(self, *args, **kwargs):
         triplets_locations = [
-            "/Users/lucasgautheron/Documents/cs/tasks/clip",
-            "/Users/lucasgautheron/Documents/cs/tasks/random"
+            "/Users/lucasgautheron/Documents/cs/tasks/clip-random.csv",
+            "/Users/lucasgautheron/Documents/cs/tasks/random.csv"
         ]
 
         nodes = []
         for block, location in enumerate(triplets_locations):
-            images = [f"{location}/{f}" for f in listdir(location) if f.endswith(".png")]
+            tasks = pd.read_csv(location)
+            images_location = splitext(location)[0]
 
             nodes += [
                 StaticNode(
                     definition={
-                        "id": basename(image),
-                        "hashes": basename(image).split(".")[0].split("_"),
+                        "id": task["image"],
+                        "hashes": [task["hash0"], task["hash1"], task["hash2"]],
                     },
                     assets={
-                        "stimulus": CachedAsset(image),
+                        hash: CachedAsset(f"{images_location}/{hash}.png")
+                        for hash in [task["hash0"], task["hash1"], task["hash2"]]
                     },
                     block=f"{block}",
                 )
-                for image in images
+                for task in tasks.to_dict(orient="records")
             ]
 
         super().__init__(*args, **kwargs, nodes=nodes)
@@ -468,29 +523,29 @@ class Exp(psynet.experiment.Experiment):
         config.update(**recruiter_settings)
 
     timeline = Timeline(
-        MainConsent(),
-        BasicDemography(),
-        survey,
-        InfoPage(
-            Markup(
-                f"<h3>Before we begin...</h3>"
-                f"<div style='margin: 10px;'>Before we begin, let us try to assess your familiarity with the scientific domain in question very briefly!</div>"
-                f"<div style='margin: 10px;'>You will be presented with a series of diagrams. For each diagram, you will have to guess the title of the scientific publication from which they originate, among multiple choices.</div>"
-                f"<div style='margin: 10px;'>If you have no idea, you may say 'I don't know'. There is no reward or penalty for being right or wrong!</div>"
-                f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task1.png' width='480' /></div>"
-            ),
-            time_estimate=5,
-        ),
-        expertise_trial,
-        InfoPage(
-            Markup(
-                f"<h3>Compare diagrams!</h3>"
-                f"<div style='margin: 10px;'>Fantastic, we can now start the aesthetic judgment task!</div>"
-                f"<div style='margin: 10px;'>You will be presented with a series of triplets of diagrams. For each triplet, you will have to pick the diagram that you find prettier.</div>"
-                f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task2.png' width='480' /></div>"
-            ),
-            time_estimate=5
-        ),
+        # MainConsent(),
+        # BasicDemography(),
+        # survey,
+        # InfoPage(
+        #     Markup(
+        #         f"<h3>Before we begin...</h3>"
+        #         f"<div style='margin: 10px;'>Before we begin, let us try to assess your familiarity with the scientific domain in question very briefly!</div>"
+        #         f"<div style='margin: 10px;'>You will be presented with a series of diagrams. For each diagram, you will have to guess the title of the scientific publication from which they originate, among multiple choices.</div>"
+        #         f"<div style='margin: 10px;'>If you have no idea, you may say 'I don't know'. There is no reward or penalty for being right or wrong!</div>"
+        #         f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task1.png' width='480' /></div>"
+        #     ),
+        #     time_estimate=5,
+        # ),
+        # expertise_trial,
+        # InfoPage(
+        #     Markup(
+        #         f"<h3>Compare diagrams!</h3>"
+        #         f"<div style='margin: 10px;'>Fantastic, we can now start the aesthetic judgment task!</div>"
+        #         f"<div style='margin: 10px;'>You will be presented with a series of triplets of diagrams. For each triplet, you will have to pick the diagram that you find prettier.</div>"
+        #         f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task2.png' width='480' /></div>"
+        #     ),
+        #     time_estimate=5
+        # ),
         aesthetic_comparison_trial,
         InfoPage(
             Markup(

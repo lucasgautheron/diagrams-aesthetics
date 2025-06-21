@@ -1,0 +1,72 @@
+{% macro simple(params) %}
+    {% if params.text is not none %}
+        <style>
+            #prompt-text {
+                text-align: {{ params.text_align }};
+            }
+        </style>
+
+        <div id="prompt-text">
+            {{ params.text_html }}
+        </div>
+    {% endif %}
+    <script>
+        let loop = {{ params.loop | tojson }};
+
+        psynet.trial.onEvent("trialFinished", function() {
+            if (loop) {
+                psynet.trial.restart();
+            }
+        });
+    </script>
+{% endmacro %}
+
+
+{% macro comparison(params) %}
+    <style>
+        .prompt-image {
+            width: {{ params.width }};
+            height: {{ params.height }};
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            margin-top: {{ params.margin_top}};
+            margin-bottom: {{ params.margin_bottom}};
+            opacity: 0;
+            border: 1px solid black;
+            margin: 10px;
+        }
+    </style>
+
+    <div style="display: flex;">
+    {% for url in params.urls %}
+        <img class="prompt-image" src="{{ url }}" alt="{{ gettext("Image not found")  | replace('"',"'") | safe  }}">
+    {% endfor %}
+    </div>
+
+    <script>
+        let promptImages = $(".prompt-image");
+
+        psynet.trial.onEvent("trialConstruct", () => {
+            promptImages.each(function() {
+                if (!this.complete) {
+                    psynet.waitForEventListener(this, "load");
+                }
+            });
+        });
+
+        psynet.trial.onEvent("promptStart", () => {
+            promptImages.each(function() {
+                this.style.opacity = 1;
+            });
+        });
+
+        psynet.trial.onEvent("promptEnd", () => {
+            promptImages.each(function() {
+                this.style.opacity = 0;
+            });
+        });
+    </script>
+
+    {{ simple(params) }}
+{% endmacro %}
