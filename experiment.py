@@ -89,6 +89,16 @@ class ExpertiseTrial(StaticTrial):
             bot_response=np.random.choice(choices + ["unknown"]),
         )
 
+    def show_feedback(self, experiment, participant):
+        if self.answer == "unknown":
+            return None
+
+        return InfoPage(
+            Markup("Congratulations, this is correct!")
+            if self.var.successful_prediction == True
+            else Markup("Nice try, but no :(")
+        )
+
 
 class ExpertiseTrialMaker(StaticTrialMaker):
     def __init__(self, *args, n_nodes, **kwargs):
