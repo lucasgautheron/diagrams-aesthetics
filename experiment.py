@@ -196,15 +196,13 @@ class ExpertiseTrialMaker(StaticTrialMaker):
                     successes[is_expert][node.id] = successes[is_expert].get(node.id, 0) + 1
                 elif trial.var.successful_prediction == False:
                     failures[is_expert][node.id] = failures[is_expert].get(node.id, 0) + 1
-
-            accuracy = np.zeros(2)
+            
+            rewards[node.id] = 0
             for is_expert in [False, True]:
-                accuracy[1 if is_expert else 0] = np.random.beta(
+                rewards[node.id] += np.random.beta(
                     alpha_prior + successes[is_expert].get(node.id, 0),
                     beta_prior + failures[is_expert].get(node.id, 0),
                 )
-
-            rewards[node.id] = np.sum(accuracy)
 
         best_node = sorted(
             list(rewards.keys()),
