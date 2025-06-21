@@ -523,29 +523,29 @@ class Exp(psynet.experiment.Experiment):
         config.update(**recruiter_settings)
 
     timeline = Timeline(
-        # MainConsent(),
-        # BasicDemography(),
-        # survey,
-        # InfoPage(
-        #     Markup(
-        #         f"<h3>Before we begin...</h3>"
-        #         f"<div style='margin: 10px;'>Before we begin, let us try to assess your familiarity with the scientific domain in question very briefly!</div>"
-        #         f"<div style='margin: 10px;'>You will be presented with a series of diagrams. For each diagram, you will have to guess the title of the scientific publication from which they originate, among multiple choices.</div>"
-        #         f"<div style='margin: 10px;'>If you have no idea, you may say 'I don't know'. There is no reward or penalty for being right or wrong!</div>"
-        #         f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task1.png' width='480' /></div>"
-        #     ),
-        #     time_estimate=5,
-        # ),
-        # expertise_trial,
-        # InfoPage(
-        #     Markup(
-        #         f"<h3>Compare diagrams!</h3>"
-        #         f"<div style='margin: 10px;'>Fantastic, we can now start the aesthetic judgment task!</div>"
-        #         f"<div style='margin: 10px;'>You will be presented with a series of triplets of diagrams. For each triplet, you will have to pick the diagram that you find prettier.</div>"
-        #         f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task2.png' width='480' /></div>"
-        #     ),
-        #     time_estimate=5
-        # ),
+        MainConsent(),
+        BasicDemography(),
+        survey,
+        InfoPage(
+            Markup(
+                f"<h3>Before we begin...</h3>"
+                f"<div style='margin: 10px;'>Before we begin, let us try to assess your familiarity with the scientific domain in question very briefly!</div>"
+                f"<div style='margin: 10px;'>You will be presented with a series of diagrams. For each diagram, you will have to guess the title of the scientific publication from which they originate, among multiple choices.</div>"
+                f"<div style='margin: 10px;'>If you have no idea, you may say 'I don't know'. There is no reward or penalty for being right or wrong!</div>"
+                f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task1.png' width='480' /></div>"
+            ),
+            time_estimate=5,
+        ),
+        expertise_trial,
+        InfoPage(
+            Markup(
+                f"<h3>Compare diagrams!</h3>"
+                f"<div style='margin: 10px;'>Fantastic, we can now start the aesthetic judgment task!</div>"
+                f"<div style='margin: 10px;'>You will be presented with a series of triplets of diagrams. For each triplet, you will have to pick the diagram that you find prettier.</div>"
+                f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task2.png' width='480' /></div>"
+            ),
+            time_estimate=5
+        ),
         aesthetic_comparison_trial,
         InfoPage(
             Markup(
