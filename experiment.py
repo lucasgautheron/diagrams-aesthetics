@@ -167,7 +167,7 @@ class ExpertiseTrialMaker(StaticTrialMaker):
         """Retrieve an informative expertise-assessment task
         by performing online Thompson sampling.
         The reward associated with a task
-        is the F-score of the prediction of experts vs non-experts,
+        is the balanced accuracy of the prediction of experts vs non-experts,
         based on prior participants' answers.
 
         Args:
@@ -204,8 +204,7 @@ class ExpertiseTrialMaker(StaticTrialMaker):
                     beta_prior + failures[is_expert].get(node.id, 0),
                 )
 
-            # F-score
-            rewards[node.id] = 2 * np.prod(accuracy) / np.sum(accuracy)
+            rewards[node.id] = np.sum(accuracy)
 
         best_node = sorted(
             list(rewards.keys()),
