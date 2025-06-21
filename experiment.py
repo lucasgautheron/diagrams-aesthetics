@@ -101,7 +101,7 @@ class ExpertiseTrial(StaticTrial):
 
 
 class ExpertiseTrialMaker(StaticTrialMaker):
-    def __init__(self, *args, n_nodes, **kwargs):
+    def __init__(self, *args, n_nodes, setup: str, **kwargs):
         triplets_location = "/Users/lucasgautheron/Documents/cs/tasks/guess-image-title/"
         tasks = pd.read_csv(
             "/Users/lucasgautheron/Documents/cs/tasks/guess-image-title.csv"
@@ -121,7 +121,12 @@ class ExpertiseTrialMaker(StaticTrialMaker):
 
         super().__init__(*args, **kwargs, nodes=nodes)
 
+        self.setup = setup
+
     def custom_network_filter(self, candidates, participant):
+        if self.setup == "static":
+            return candidates
+
         nodes = []
         for candidate in candidates:
             nodes += candidate.nodes()
@@ -386,6 +391,7 @@ expertise_trial = ExpertiseTrialMaker(
     id_="expertise_trial",
     trial_class=ExpertiseTrial,
     n_nodes=N_EXPERTISE_NODES,
+    setup="adaptive",
     expected_trials_per_participant=N_EXPERTISE_TRIALS,
     max_trials_per_participant=N_EXPERTISE_TRIALS,
     target_trials_per_node=None,
