@@ -38,10 +38,17 @@ from typing import List, Union, Optional
 
 DEBUG = True
 MODE = "HOTAIR"
-DURATION_ESTIMATE = 15 * 60
 
-N_EXPERTISE_TRIALS = 3
-N_EXPERTISE_NODES = 50
+TIMELINE = "EXPERTISE"
+
+if TIMELINE == "EXPERTISE":
+    DURATION_ESTIMATE = 15 * 60
+    N_EXPERTISE_TRIALS = 15
+    N_EXPERTISE_NODES = 50
+else:
+    DURATION_ESTIMATE = 15 * 60
+    N_EXPERTISE_TRIALS = 3
+    N_EXPERTISE_NODES = 50
 
 N_TARGET_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 150
 N_MAX_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 150
@@ -176,8 +183,10 @@ class ExpertiseTrialMaker(StaticTrialMaker):
         Returns:
             int: id of the selected node
         """
-        alpha_prior = 1
-        beta_prior = 1
+
+        # It more plausible for non-experts to fail, than it is for experts to succeed
+        alpha_prior = {False: 2, True: 1}
+        beta_prior = {False: 1, True: 2}
 
         successes, failures = (
             {False: dict(), True: dict()},
@@ -196,12 +205,12 @@ class ExpertiseTrialMaker(StaticTrialMaker):
                     successes[is_expert][node.id] = successes[is_expert].get(node.id, 0) + 1
                 elif trial.var.successful_prediction == False:
                     failures[is_expert][node.id] = failures[is_expert].get(node.id, 0) + 1
-            
+
             rewards[node.id] = 0
             for is_expert in [False, True]:
                 rewards[node.id] += np.random.beta(
-                    alpha_prior + successes[is_expert].get(node.id, 0),
-                    beta_prior + failures[is_expert].get(node.id, 0),
+                    alpha_prior[is_expert] + successes[is_expert].get(node.id, 0),
+                    beta_prior[is_expert] + failures[is_expert].get(node.id, 0),
                 )
 
         best_node = sorted(
@@ -388,7 +397,7 @@ expertise_trial = ExpertiseTrialMaker(
     id_="expertise_trial",
     trial_class=ExpertiseTrial,
     n_nodes=N_EXPERTISE_NODES,
-    setup="adaptive",
+    setup="adaptive" if TIMELINE == "EXPERTISE" else "static",
     expected_trials_per_participant=N_EXPERTISE_TRIALS,
     max_trials_per_participant=N_EXPERTISE_TRIALS,
     target_trials_per_node=None,
@@ -535,43 +544,63 @@ class Exp(psynet.experiment.Experiment):
     if MODE != "HOTAIR":
         config.update(**recruiter_settings)
 
-    timeline = Timeline(
-        MainConsent(),
-        BasicDemography(),
-        survey,
-        InfoPage(
-            Markup(
-                f"<h3>Before we begin...</h3>"
-                f"<div style='margin: 10px;'>Before we begin, let us try to assess your familiarity with the scientific domain in question very briefly!</div>"
-                f"<div style='margin: 10px;'>You will be presented with a series of diagrams. For each diagram, you will have to guess the title of the scientific publication from which they originate, among multiple choices.</div>"
-                f"<div style='margin: 10px;'>If you have no idea, you may say 'I don't know'. There is no reward or penalty for being right or wrong!</div>"
-                f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task1.png' width='480' /></div>"
+    if TIMELINE == "EXPERTISE":
+        timeline = Timeline(
+            MainConsent(),
+            BasicDemography(),
+            survey,
+            InfoPage(
+                Markup(
+                    f"<h3>Before we begin...</h3>"
+                    f"<div style='margin: 10px;'>You will be presented with a series of diagrams. For each diagram, you will have to guess the title of the scientific publication from which they originate, among multiple choices.</div>"
+                    f"<div style='margin: 10px;'>If you have no idea, you may say 'I don't know'. There is no reward or penalty for being right or wrong!</div>"
+                    f"<div style='margin: 10px;'>If you make a guess, we will tell you whether you were correct or not.</div>"
+                    f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task1.png' width='480' /></div>"
+                ),
+                time_estimate=5,
             ),
-            time_estimate=5,
-        ),
-        expertise_trial,
-        InfoPage(
-            Markup(
-                f"<h3>Compare diagrams!</h3>"
-                f"<div style='margin: 10px;'>Fantastic, we can now start the aesthetic judgment task!</div>"
-                f"<div style='margin: 10px;'>You will be presented with a series of triplets of diagrams. For each triplet, you will have to pick the diagram that you find prettier.</div>"
-                f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task2.png' width='480' /></div>"
+            expertise_trial,
+            SuccessfulEndPage(),
+        )
+
+    else:
+        timeline = Timeline(
+            MainConsent(),
+            BasicDemography(),
+            survey,
+            InfoPage(
+                Markup(
+                    f"<h3>Before we begin...</h3>"
+                    f"<div style='margin: 10px;'>Before we begin, let us try to assess your familiarity with the scientific domain in question very briefly!</div>"
+                    f"<div style='margin: 10px;'>You will be presented with a series of diagrams. For each diagram, you will have to guess the title of the scientific publication from which they originate, among multiple choices.</div>"
+                    f"<div style='margin: 10px;'>If you have no idea, you may say 'I don't know'. There is no reward or penalty for being right or wrong!</div>"
+                    f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task1.png' width='480' /></div>"
+                ),
+                time_estimate=5,
             ),
-            time_estimate=5
-        ),
-        aesthetic_comparison_trial,
-        InfoPage(
-            Markup(
-                f"<h3>Rate diagrams!</h3>"
-                "<div style='margin: 10px;'>Thank you! Let us finish with a slightly different task, assessing your aesthetic preferences in an other way.</div>"
-                f"<div style='margin: 10px;'>You will be presented with a series of diagrams. Rate each diagram from 0 (ugliest) to 10 (prettiest).</div>"
-                f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task3.png' width='480' /></div>"
+            expertise_trial,
+            InfoPage(
+                Markup(
+                    f"<h3>Compare diagrams!</h3>"
+                    f"<div style='margin: 10px;'>Fantastic, we can now start the aesthetic judgment task!</div>"
+                    f"<div style='margin: 10px;'>You will be presented with a series of triplets of diagrams. For each triplet, you will have to pick the diagram that you find prettier.</div>"
+                    f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task2.png' width='480' /></div>"
+                ),
+                time_estimate=5
             ),
-            time_estimate=5
-        ),
-        aesthetic_rating_trial,
-        SuccessfulEndPage(),
-    )
+            aesthetic_comparison_trial,
+            InfoPage(
+                Markup(
+                    f"<h3>Rate diagrams!</h3>"
+                    "<div style='margin: 10px;'>Thank you! Let us finish with a slightly different task, assessing your aesthetic preferences in an other way.</div>"
+                    f"<div style='margin: 10px;'>You will be presented with a series of diagrams. Rate each diagram from 0 (ugliest) to 10 (prettiest).</div>"
+                    f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task3.png' width='480' /></div>"
+                ),
+                time_estimate=5
+            ),
+            aesthetic_rating_trial,
+            SuccessfulEndPage(),
+        )
 
     test_n_bots = 10
 
