@@ -21,7 +21,7 @@ from psynet.trial.static import StaticNode, StaticTrialMaker, StaticTrial
 from psynet.page import InfoPage, SuccessfulEndPage
 from psynet.consent import MainConsent
 
-from psynet.asset import CachedAsset, LocalStorage, S3Storage
+from psynet.asset import CachedAsset, LocalStorage, S3Storage, ExternalS3Asset, asset
 
 from markupsafe import Markup
 
@@ -39,12 +39,12 @@ from typing import List, Union, Optional
 DEBUG = True
 MODE = "HOTAIR"
 
-TIMELINE = "EXPERTISE"
+TIMELINE = "AESTHETIC"
 
 if TIMELINE == "EXPERTISE":
     DURATION_ESTIMATE = 15 * 60
-    N_EXPERTISE_TRIALS = 15
-    N_EXPERTISE_NODES = 50
+    N_EXPERTISE_TRIALS = 30
+    N_EXPERTISE_NODES = 60
 else:
     DURATION_ESTIMATE = 15 * 60
     N_EXPERTISE_TRIALS = 3
@@ -109,10 +109,12 @@ class ExpertiseTrial(StaticTrial):
 
 class ExpertiseTrialMaker(StaticTrialMaker):
     def __init__(self, *args, n_nodes, setup: str, **kwargs):
-        triplets_location = "/Users/lucasgautheron/Documents/cs/tasks/guess-image-title/"
+        triplets_location = ""
         tasks = pd.read_csv(
-            "/Users/lucasgautheron/Documents/cs/tasks/guess-image-title.csv"
+            "static/tasks/guess-image-title.csv"
         ).head(n_nodes)
+
+        images_location = splitext("static/tasks/guess-image-title.csv")[0]
 
         nodes = [
             ExpertiseNode(
@@ -121,7 +123,7 @@ class ExpertiseTrialMaker(StaticTrialMaker):
                     "title": task["target_title"],
                     "choices": [task[f"choice_{i}"] for i in range(task["num_choices"])],
                 },
-                assets={"stimulus": CachedAsset(f"{triplets_location}/{task['image']}")},
+                assets={"stimulus": asset(f"{images_location}/{task['image']}", cache=True)},
             )
             for task in tasks.to_dict(orient="records")
         ]
@@ -302,8 +304,8 @@ class CompareTrial(StaticTrial):
 class AestheticComparisonTrialMaker(StaticTrialMaker):
     def __init__(self, *args, **kwargs):
         triplets_locations = [
-            "/Users/lucasgautheron/Documents/cs/tasks/clip-random.csv",
-            "/Users/lucasgautheron/Documents/cs/tasks/random.csv"
+            "static/tasks/clip-random.csv",
+            "static/tasks/random.csv"
         ]
 
         nodes = []
@@ -318,7 +320,7 @@ class AestheticComparisonTrialMaker(StaticTrialMaker):
                         "hashes": [task["hash0"], task["hash1"], task["hash2"]],
                     },
                     assets={
-                        hash: CachedAsset(f"{images_location}/{hash}.png")
+                        hash: asset(f"{images_location}/{hash}.png", cache=True)
                         for hash in [task["hash0"], task["hash1"], task["hash2"]]
                     },
                     block=f"{block}",
@@ -365,26 +367,25 @@ class RateTrial(StaticTrial):
 
 class AestheticRatingTrialMaker(StaticTrialMaker):
     def __init__(self, *args, **kwargs):
-        triplets_locations = [
-            "/Users/lucasgautheron/Documents/cs/tasks/rating1",
-        ]
+        tasks_metadata = ["static/tasks/rating1.csv"]
 
         nodes = []
-        for block, location in enumerate(triplets_locations):
-            images = [f"{location}/{f}" for f in listdir(location) if f.endswith(".png")]
+        for block, location in enumerate(tasks_metadata):
+            tasks = pd.read_csv(location).to_dict(orient="records")
+            images_location = splitext(location)[0]
 
             nodes += [
                 StaticNode(
                     definition={
-                        "id": basename(image),
-                        "hash": basename(image).split(".")[0],
+                        "id": basename(task["hash"]),
+                        "hash": task["hash"],
                     },
                     assets={
-                        "stimulus": CachedAsset(image),
+                        "stimulus": asset(f"{images_location}/{task['image']}.png", cache=True),
                     },
                     block=f"{block}",
                 )
-                for image in images
+                for task in tasks
             ]
 
         super().__init__(*args, **kwargs, nodes=nodes)
@@ -407,31 +408,32 @@ expertise_trial = ExpertiseTrialMaker(
     balance_across_nodes=False,
 )
 
-aesthetic_comparison_trial = AestheticComparisonTrialMaker(
-    id_="aesthetic_comparison_trial",
-    trial_class=CompareTrial,
-    expected_trials_per_participant=N_TARGET_TRIPLETS_PER_PARTICIPANTS,
-    max_trials_per_participant=N_MAX_TRIPLETS_PER_PARTICIPANTS,
-    target_trials_per_node=N_TRIALS_PER_TRIPLET,
-    target_n_participants=1,
-    recruit_mode="n_participants",
-    allow_repeated_nodes=False,
-    balance_across_nodes=False,
-    n_repeat_trials=3
-)
+if TIMELINE != "EXPERTISE":
+    aesthetic_comparison_trial = AestheticComparisonTrialMaker(
+        id_="aesthetic_comparison_trial",
+        trial_class=CompareTrial,
+        expected_trials_per_participant=N_TARGET_TRIPLETS_PER_PARTICIPANTS,
+        max_trials_per_participant=N_MAX_TRIPLETS_PER_PARTICIPANTS,
+        target_trials_per_node=N_TRIALS_PER_TRIPLET,
+        target_n_participants=1,
+        recruit_mode="n_participants",
+        allow_repeated_nodes=False,
+        balance_across_nodes=False,
+        n_repeat_trials=3
+    )
 
-aesthetic_rating_trial = AestheticRatingTrialMaker(
-    id_="aesthetic_rating_trial",
-    trial_class=RateTrial,
-    expected_trials_per_participant=N_TARGET_RATINGS_PER_PARTICIPANTS,
-    max_trials_per_participant=N_MAX_RATINGS_PER_PARTICIPANTS,
-    target_trials_per_node=N_TRIALS_PER_RATING,
-    target_n_participants=1,
-    recruit_mode="n_participants",
-    allow_repeated_nodes=False,
-    balance_across_nodes=False,
-    n_repeat_trials=3
-)
+    aesthetic_rating_trial = AestheticRatingTrialMaker(
+        id_="aesthetic_rating_trial",
+        trial_class=RateTrial,
+        expected_trials_per_participant=N_TARGET_RATINGS_PER_PARTICIPANTS,
+        max_trials_per_participant=N_MAX_RATINGS_PER_PARTICIPANTS,
+        target_trials_per_node=N_TRIALS_PER_RATING,
+        target_n_participants=1,
+        recruit_mode="n_participants",
+        allow_repeated_nodes=False,
+        balance_across_nodes=False,
+        n_repeat_trials=3
+    )
 
 survey = ModularPage(
     "survey",
@@ -517,16 +519,16 @@ elif MODE == "CAP":
 
 class Exp(psynet.experiment.Experiment):
     label = "Pretty diagrams"
-    asset_storage = LocalStorage()
-    # asset_storage = LocalStorage("assets")
-    # asset_storage = S3Storage("psynet-tests", "diagrams-aesthetics")
+    # asset_storage = LocalStorage()
+    # asset_storage = LocalStorage    # asset_storage = LocalStorage("assets")("assets")
+    asset_storage = S3Storage("lucasgautheron", "diagrams-aesthetics")
 
     config = {
         "recruiter": recruiters[MODE],
         "wage_per_hour": 0,
         # "publish_experiment": False,
         "title": _(
-            "Pretty diagrams (Chrome browser, ~15 minutes to complete, ~2pounds)"),
+            "Pretty diagrams (Chrome browser, ~15 minutes to complete, ~2£)"),
 
         "description": " ".join([
             _("This experiment requires you to rate images (scientific diagrams) according to how pretty you find them."),
@@ -547,7 +549,7 @@ class Exp(psynet.experiment.Experiment):
     if TIMELINE == "EXPERTISE":
         timeline = Timeline(
             MainConsent(),
-            BasicDemography(),
+            # BasicDemography(),
             survey,
             InfoPage(
                 Markup(
@@ -566,7 +568,7 @@ class Exp(psynet.experiment.Experiment):
     else:
         timeline = Timeline(
             MainConsent(),
-            BasicDemography(),
+            # BasicDemography(),
             survey,
             InfoPage(
                 Markup(
