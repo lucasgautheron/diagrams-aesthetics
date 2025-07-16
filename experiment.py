@@ -19,7 +19,7 @@ from psynet.trial.chain import ChainNode
 
 from psynet.trial.static import StaticNode, StaticTrialMaker, StaticTrial
 from psynet.page import InfoPage, SuccessfulEndPage
-from psynet.consent import MainConsent
+from psynet.consent import MainConsent, NoConsent
 
 from psynet.asset import CachedAsset, LocalStorage, S3Storage, ExternalS3Asset, asset
 
@@ -39,10 +39,12 @@ from typing import List, Union, Optional
 S3_BUCKET = "lucasgautheron"
 S3_KEY = "diagrams-aesthetics"
 
+
 def get_s3_url(stimulus):
     return f"https://{S3_BUCKET}.s3.amazonaws.com/{S3_KEY}/{stimulus}"
 
-DEBUG = True
+
+DEBUG = False
 MODE = "HOTAIR"
 
 TIMELINE = "AESTHETIC"
@@ -554,8 +556,8 @@ class Exp(psynet.experiment.Experiment):
 
     if TIMELINE == "EXPERTISE":
         timeline = Timeline(
-            MainConsent(),
-            # BasicDemography(),
+            NoConsent() if DEBUG else MainConsent(),
+            BasicDemography(),
             survey,
             InfoPage(
                 Markup(
@@ -573,8 +575,8 @@ class Exp(psynet.experiment.Experiment):
 
     else:
         timeline = Timeline(
-            MainConsent(),
-            # BasicDemography(),
+            NoConsent() if DEBUG else MainConsent(),
+            BasicDemography(),
             survey,
             InfoPage(
                 Markup(
