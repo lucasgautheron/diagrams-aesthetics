@@ -30,3 +30,12 @@ The experiment features three tasks:
 ## Task 3 - Subjective rating
 
 ![](static/images/task3.png)
+
+
+## S3 steps
+
+```bash
+aws s3 sync static/tasks s3://lucasgautheron/diagrams-aesthetics 
+aws s3api put-bucket-policy --bucket lucasgautheron --policy file://my-policy.json
+aws s3api put-bucket-cors --bucket lucasgautheron --cors-configuration file://my-cors.json
+```

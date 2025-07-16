@@ -36,6 +36,12 @@ import json
 
 from typing import List, Union, Optional
 
+S3_BUCKET = "lucasgautheron"
+S3_KEY = "diagrams-aesthetics"
+
+def get_s3_url(stimulus):
+    return f"https://{S3_BUCKET}.s3.amazonaws.com/{S3_KEY}/{stimulus}"
+
 DEBUG = True
 MODE = "HOTAIR"
 
@@ -114,7 +120,7 @@ class ExpertiseTrialMaker(StaticTrialMaker):
             "static/tasks/guess-image-title.csv"
         ).head(n_nodes)
 
-        images_location = splitext("static/tasks/guess-image-title.csv")[0]
+        images_location = splitext(basename("static/tasks/guess-image-title.csv"))[0]
 
         nodes = [
             ExpertiseNode(
@@ -123,7 +129,7 @@ class ExpertiseTrialMaker(StaticTrialMaker):
                     "title": task["target_title"],
                     "choices": [task[f"choice_{i}"] for i in range(task["num_choices"])],
                 },
-                assets={"stimulus": asset(f"{images_location}/{task['image']}", cache=True)},
+                assets={"stimulus": asset(get_s3_url(f"{images_location}/{task['image']}"), cache=True)},
             )
             for task in tasks.to_dict(orient="records")
         ]
@@ -311,7 +317,7 @@ class AestheticComparisonTrialMaker(StaticTrialMaker):
         nodes = []
         for block, location in enumerate(triplets_locations):
             tasks = pd.read_csv(location)
-            images_location = splitext(location)[0]
+            images_location = splitext(basename(location))[0]
 
             nodes += [
                 StaticNode(
@@ -320,7 +326,7 @@ class AestheticComparisonTrialMaker(StaticTrialMaker):
                         "hashes": [task["hash0"], task["hash1"], task["hash2"]],
                     },
                     assets={
-                        hash: asset(f"{images_location}/{hash}.png", cache=True)
+                        hash: asset(get_s3_url(f"{images_location}/{hash}.png"), cache=True)
                         for hash in [task["hash0"], task["hash1"], task["hash2"]]
                     },
                     block=f"{block}",
@@ -372,7 +378,7 @@ class AestheticRatingTrialMaker(StaticTrialMaker):
         nodes = []
         for block, location in enumerate(tasks_metadata):
             tasks = pd.read_csv(location).to_dict(orient="records")
-            images_location = splitext(location)[0]
+            images_location = splitext(basename(location))[0]
 
             nodes += [
                 StaticNode(
@@ -381,7 +387,7 @@ class AestheticRatingTrialMaker(StaticTrialMaker):
                         "hash": task["hash"],
                     },
                     assets={
-                        "stimulus": asset(f"{images_location}/{task['image']}.png", cache=True),
+                        "stimulus": asset(get_s3_url(f"{images_location}/{task['hash']}.png"), cache=True),
                     },
                     block=f"{block}",
                 )
