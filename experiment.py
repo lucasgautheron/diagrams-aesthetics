@@ -39,7 +39,6 @@ from typing import List, Union, Optional
 S3_BUCKET = "lucasgautheron"
 S3_KEY = "diagrams-aesthetics"
 
-
 def get_s3_url(stimulus):
     return f"https://{S3_BUCKET}.s3.amazonaws.com/{S3_KEY}/{stimulus}"
 
@@ -357,11 +356,6 @@ class RateTrial(StaticTrial):
                 width=350,
                 height=350,
             ),
-            # PushButtonControl(
-            #     choices=np.arange(10) + 1,
-            #     labels=list(np.arange(10) + 1),
-            #     arrange_vertically=False,
-            # ),
             SliderControl(
                 start_value=5,
                 min_value=0,
@@ -369,7 +363,7 @@ class RateTrial(StaticTrial):
                 slider_id="slider",
                 template_filename="slider_value.html"
             ),
-            bot_response=np.random.uniform(1, 10),
+            bot_response=np.random.uniform(0, 10),
         )
 
 
