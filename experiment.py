@@ -11,21 +11,31 @@ from psynet.modular_page import (
     DropdownControl,
     SurveyJSControl,
     SliderControl,
-    HtmlSliderControl
+    HtmlSliderControl,
 )
 
-from psynet.timeline import Module, Timeline, Response, Event
+from psynet.timeline import Timeline, CodeBlock, ModuleState, Response
+from psynet.participant import Participant
 from psynet.trial.chain import ChainNode
 
+from psynet.trial.main import Trial
 from psynet.trial.static import StaticNode, StaticTrialMaker, StaticTrial
 from psynet.page import InfoPage, SuccessfulEndPage
 from psynet.consent import MainConsent, NoConsent
 
-from psynet.asset import CachedAsset, LocalStorage, S3Storage, ExternalS3Asset, asset
+from psynet.asset import (
+    CachedAsset, S3Storage,
+    asset,
+)
+
+from psynet.utils import log_time_taken
+
+from dallinger import db
+from sqlalchemy import Column, Integer
+from sqlalchemy.ext.declarative import declared_attr
 
 from markupsafe import Markup
 
-from os import listdir
 from os.path import basename, splitext
 
 import pandas as pd
@@ -33,11 +43,13 @@ import numpy as np
 import random
 
 import json
+import csv
 
 from typing import List, Union, Optional
 
 S3_BUCKET = "lucasgautheron"
 S3_KEY = "diagrams-aesthetics"
+
 
 def get_s3_url(stimulus):
     return f"https://{S3_BUCKET}.s3.amazonaws.com/{S3_KEY}/{stimulus}"
@@ -46,7 +58,7 @@ def get_s3_url(stimulus):
 DEBUG = False
 MODE = "HOTAIR"
 
-TIMELINE = "AESTHETIC"
+TIMELINE = "EXPERTISE"
 
 if TIMELINE == "EXPERTISE":
     DURATION_ESTIMATE = 15 * 60
@@ -66,6 +78,102 @@ N_MAX_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 75
 N_TRIALS_PER_RATING = 5
 
 
+class ActiveInference:
+    def get_optimal_node(self, nodes_ids, participant, data):
+        z_i = participant.var.z
+
+        S = 1000
+
+        rewards = dict()
+        eig = dict()
+        utility = dict()
+        p_outcome = dict()
+
+        alphas = dict()
+        betas = dict()
+
+        z_participants = np.array(
+            [
+                data["participants"][participant_id]["z"]
+                for participant_id in data["participants"]
+                if data["participants"][participant_id]["z"] != None
+            ],
+        )
+
+        alpha_z = 1 + np.sum(z_participants == 1)
+        beta_z = 1 + np.sum(z_participants == 0)
+        p_z = alpha_z / (alpha_z + beta_z)
+
+        for node_id in nodes_ids:
+            alpha = np.ones(2)
+            beta = np.ones(2)
+
+            for trial_id, trial in data["nodes"][node_id].items():
+                if trial["y"] == True:
+                    alpha[trial["z"]] += 1
+                elif trial["y"] == False:
+                    beta[trial["z"]] += 1
+
+            alphas[node_id] = alpha
+            betas[node_id] = beta
+
+            alpha = alpha[:, np.newaxis]
+            beta = beta[:, np.newaxis]
+
+            phi = np.random.beta(
+                alpha,
+                beta,
+                (2, S),
+            )
+
+            y = np.random.binomial(
+                np.ones((2, S), dtype=int),
+                phi,
+                size=(
+                    2,
+                    S,
+                ),
+            )
+
+            p_y_given_phi = phi * y + (1 - phi) * (1 - y)
+            p_y = alpha / (alpha + beta) * y + beta / (alpha + beta) * (1 - y)
+
+            EIG = np.mean(np.log(p_y_given_phi[z_i] / p_y[z_i]))
+
+            gamma = 0.1
+            p_z = 0.5  # assume equi-representation of experts and non-experts
+            U = gamma * np.mean(
+                p_z * y[1]
+                + (1 - p_z) * (1 - y[0])
+                - p_z * (1 - y[1])
+                - (1 - p_z) * y[0],
+            )
+
+            rewards[node_id] = EIG + U
+            eig[node_id] = EIG
+            utility[node_id] = U
+            p_outcome[node_id] = float((alpha / (alpha + beta))[z_i].mean())
+
+        best_node = sorted(
+            list(rewards.keys()),
+            key=lambda node_id: rewards[node_id],
+            reverse=True,
+        )[0]
+
+        if len(nodes_ids) == 15:
+            with open(f"output/utility.csv", "a", newline="") as file:
+                writer = csv.writer(file)
+                writer.writerow(
+                    [
+                        rewards[best_node],
+                        eig[best_node],
+                        utility[best_node],
+                    ],
+                )
+
+        return best_node, {0: 1 - p_outcome[best_node], 1: p_outcome[best_node]}
+
+
 class ExpertiseNode(ChainNode):
     pass
 
@@ -73,13 +181,16 @@ class ExpertiseNode(ChainNode):
 class ExpertiseTrial(StaticTrial):
     time_estimate = 60
 
+    @declared_attr
+    def y(cls):
+        return cls.__table__.c.get("y", Column(Integer))
+
+    @declared_attr
+    def z(cls):
+        return cls.__table__.c.get("z", Column(Integer))
+
     def __init__(self, experiment, node, participant, *args, **kwargs):
         super().__init__(experiment, node, participant, *args, **kwargs)
-
-        # success variable is True if the answer to the trial
-        # correctly predicts the expert-status of the participant
-        self.var.successful_prediction = None
-        self.var.expert_status = None
 
     def show_trial(self, experiment, participant):
         choices = self.definition["choices"]
@@ -91,7 +202,8 @@ class ExpertiseTrial(StaticTrial):
             ImagePrompt(
                 asset,
                 Markup(
-                    "<div style='text-align: center; margin: 1em;'>Can you guess the title of the article from which this diagram was extracted?</div>"),
+                    "<div style='text-align: center; margin: 1em;'>Can you guess the title of the article from which this diagram was extracted?</div>",
+                ),
                 width=350,
                 height=350,
             ),
@@ -109,8 +221,8 @@ class ExpertiseTrial(StaticTrial):
 
         return InfoPage(
             Markup("Congratulations, this is correct!")
-            if self.var.successful_prediction == True
-            else Markup("Nice try, but no :(")
+            if self.y == True
+            else Markup("Nice try, but no :("),
         )
 
 
@@ -118,116 +230,130 @@ class ExpertiseTrialMaker(StaticTrialMaker):
     def __init__(self, *args, n_nodes, setup: str, **kwargs):
         triplets_location = ""
         tasks = pd.read_csv(
-            "static/tasks/guess-image-title.csv"
+            "static/tasks/guess-image-title.csv",
         ).head(n_nodes)
 
-        images_location = splitext(basename("static/tasks/guess-image-title.csv"))[0]
+        images_location = \
+            splitext(basename("static/tasks/guess-image-title.csv"))[0]
 
         nodes = [
             ExpertiseNode(
                 definition={
                     "id": task["image"],
                     "title": task["target_title"],
-                    "choices": [task[f"choice_{i}"] for i in range(task["num_choices"])],
+                    "choices": [task[f"choice_{i}"] for i in
+                                range(task["num_choices"])],
                 },
-                assets={"stimulus": asset(get_s3_url(f"{images_location}/{task['image']}"), cache=True)},
+                assets={
+                    "stimulus": asset(
+                        get_s3_url(f"{images_location}/{task['image']}"),
+                        cache=True,
+                    ),
+                },
             )
             for task in tasks.to_dict(orient="records")
         ]
 
         super().__init__(*args, **kwargs, nodes=nodes)
 
-        self.setup = setup
-
-    def custom_network_filter(self, candidates, participant):
-        if self.setup == "static":
-            return candidates
-
-        nodes = []
-        for candidate in candidates:
-            nodes += candidate.nodes()
-
-        next_node_id = ExpertiseTrialMaker.thompson_sampling(nodes)
-
-        for candidate in candidates:
-            if any([node.id == next_node_id for node in candidate.nodes()]):
-                return [candidate]
-
-        return candidates
+        self.optimizer = ActiveInference()
 
     def finalize_trial(self, answer, trial, experiment, participant):
-        # Get participant expertise
-        response = Response.query.filter_by(
-            question="survey", participant_id=participant.id
-        ).one()
+        correct_answer = answer == trial.node.definition["title"]
 
-        expert = response.answer.get("expertise") in [
-            "I am a computer scientist",
-            "I am a scientist, but in another STEM field",
-        ]
+        trial.y = int(correct_answer)
 
-        node = trial.node
-
-        correct_answer = answer == node.definition["title"]
-        successful_prediction = (correct_answer == True and expert == True) or (
-                (correct_answer == False) and (expert == False)
-        )
-
-        trial.var.successful_prediction = successful_prediction == True
-        trial.var.expert_status = expert
+        z = participant.var.get("z", None)
+        trial.z = int(z) if z is not None else None
 
         super().finalize_trial(answer, trial, experiment, participant)
 
-    @staticmethod
-    def thompson_sampling(nodes: List[psynet.trial.static.StaticNode]) -> int:
-        """Retrieve an informative expertise-assessment task
-        by performing online Thompson sampling.
-        The reward associated with a task
-        is the balanced accuracy of the prediction of experts vs non-experts,
-        based on prior participants' answers.
+    @log_time_taken
+    def prior_data(self):
+        data = {"nodes": dict(), "participants": dict()}
 
-        Args:
-            nodes (List[psynet.trial.static.StaticNode]): candidate nodes
-
-        Returns:
-            int: id of the selected node
-        """
-
-        # It more plausible for non-experts to fail, than it is for experts to succeed
-        alpha_prior = {False: 2, True: 1}
-        beta_prior = {False: 1, True: 2}
-
-        successes, failures = (
-            {False: dict(), True: dict()},
-            {False: dict(), True: dict()},
+        # List participants involved in this trial maker
+        participants = (
+            db.session.query(Participant)
+            .join(Participant._module_states)
+            .filter(
+                ModuleState.module_id == self.id, ModuleState.started == True,
+            )
+            .distinct()
+            .all()
         )
-        rewards = dict()
 
+        data["participants"] = {
+            participant.id: {
+                "z": (
+                    participant.var.get("z", None)
+                ),
+            }
+            for participant in participants
+        }
+
+        # Fetch all nodes related to this trial maker
+        nodes = self.network_class.query.filter_by(
+            trial_maker_id=self.id, full=False, failed=False,
+        ).all()
+
+        # Fetch all trials that belong to this trial maker
+        trials = Trial.query.filter(
+            Trial.failed == False,
+            Trial.finalized == True,
+            Trial.is_repeat_trial == False,
+            Trial.trial_maker_id == self.id,
+        ).all()
+
+        trials_by_node = {}
+        for trial in trials:
+            if trial.node_id not in trials_by_node:
+                trials_by_node[trial.node_id] = []
+            trials_by_node[trial.node_id].append(trial)
+
+        # Process trials for each node
         for node in nodes:
-            for trial in node.viable_trials:
-                if trial.var.expert_status is None:
-                    continue
+            data["nodes"][node.id] = {}
 
-                is_expert = trial.var.expert_status
+            if node.id in trials_by_node:
+                data["nodes"][node.id] = {
+                    trial.id: {
+                        "y": trial.y,
+                        "z": trial.z,
+                        "participant_id": trial.participant_id,
+                    }
+                    for trial in trials_by_node[node.id]
+                    if trial.y is not None
+                }
 
-                if trial.var.successful_prediction == True:
-                    successes[is_expert][node.id] = successes[is_expert].get(node.id, 0) + 1
-                elif trial.var.successful_prediction == False:
-                    failures[is_expert][node.id] = failures[is_expert].get(node.id, 0) + 1
+        return data
 
-            rewards[node.id] = 0
-            for is_expert in [False, True]:
-                rewards[node.id] += np.random.beta(
-                    alpha_prior[is_expert] + successes[is_expert].get(node.id, 0),
-                    beta_prior[is_expert] + failures[is_expert].get(node.id, 0),
-                )
+    # overload the default prioritize_networks method
+    @log_time_taken
+    def prioritize_networks(self, networks, participant, experiment):
+        if self.optimizer is None:
+            return networks
 
-        best_node = sorted(
-            list(rewards.keys()),
-            key=lambda node: rewards[node],
-            reverse=True,
-        )[0]
-        return best_node
+        node_network = {
+            network.head.id: i for i, network in enumerate(networks)
+        }
+
+        # retrieve all relevant prior data
+        data = self.prior_data()
+
+        # retrieve optimal node
+        next_node, p = self.optimizer.get_optimal_node(
+            list(node_network.keys()), participant, data,
+        )
+
+        # store the optimizer estimate of p(y)
+        participant.var.set("p_y", p)
+
+        # early-stopping
+        if next_node is None:
+            return []
+
+        return [networks[node_network[next_node]]]
 
 
 class AestheticComparisonPrompt(Prompt):
@@ -267,12 +393,12 @@ class AestheticComparisonPrompt(Prompt):
 
     def update_events(self, events):
         events["promptStart"] = Event(
-            is_triggered_by="trialStart", delay=self.show_after
+            is_triggered_by="trialStart", delay=self.show_after,
         )
 
         if self.hide_after is not None:
             events["promptEnd"] = Event(
-                is_triggered_by="promptStart", delay=self.hide_after
+                is_triggered_by="promptStart", delay=self.hide_after,
             )
 
 
@@ -295,7 +421,8 @@ class CompareTrial(StaticTrial):
             AestheticComparisonPrompt(
                 assets,
                 Markup(
-                    "<div style='text-align: center; margin: 1em;'>Which diagram is the prettiest among the three, in your opinion?</div>"),
+                    "<div style='text-align: center; margin: 1em;'>Which diagram is the prettiest among the three, in your opinion?</div>",
+                ),
                 width=300,
                 height=300,
             ),
@@ -312,7 +439,7 @@ class AestheticComparisonTrialMaker(StaticTrialMaker):
     def __init__(self, *args, **kwargs):
         triplets_locations = [
             "static/tasks/clip-random.csv",
-            "static/tasks/random.csv"
+            "static/tasks/random.csv",
         ]
 
         nodes = []
@@ -327,8 +454,12 @@ class AestheticComparisonTrialMaker(StaticTrialMaker):
                         "hashes": [task["hash0"], task["hash1"], task["hash2"]],
                     },
                     assets={
-                        hash: asset(get_s3_url(f"{images_location}/{hash}.png"), cache=True)
-                        for hash in [task["hash0"], task["hash1"], task["hash2"]]
+                        hash: asset(
+                            get_s3_url(f"{images_location}/{hash}.png"),
+                            cache=True,
+                        )
+                        for hash in
+                        [task["hash0"], task["hash1"], task["hash2"]]
                     },
                     block=f"{block}",
                 )
@@ -352,7 +483,8 @@ class RateTrial(StaticTrial):
             ImagePrompt(
                 asset,
                 Markup(
-                    "<div style='text-align: center; margin: 1em;'>Please rate the diagram aesthetically on a scale from left (ugliest) to right (prettiest).</div>"),
+                    "<div style='text-align: center; margin: 1em;'>Please rate the diagram aesthetically on a scale from left (ugliest) to right (prettiest).</div>",
+                ),
                 width=350,
                 height=350,
             ),
@@ -361,7 +493,7 @@ class RateTrial(StaticTrial):
                 min_value=0,
                 max_value=10,
                 slider_id="slider",
-                template_filename="slider_value.html"
+                template_filename="slider_value.html",
             ),
             bot_response=np.random.uniform(0, 10),
         )
@@ -383,7 +515,10 @@ class AestheticRatingTrialMaker(StaticTrialMaker):
                         "hash": task["hash"],
                     },
                     assets={
-                        "stimulus": asset(get_s3_url(f"{images_location}/{task['hash']}.png"), cache=True),
+                        "stimulus": asset(
+                            get_s3_url(f"{images_location}/{task['hash']}.png"),
+                            cache=True,
+                        ),
                     },
                     block=f"{block}",
                 )
@@ -421,7 +556,7 @@ if TIMELINE != "EXPERTISE":
         recruit_mode="n_participants",
         allow_repeated_nodes=False,
         balance_across_nodes=False,
-        n_repeat_trials=3
+        n_repeat_trials=3,
     )
 
     aesthetic_rating_trial = AestheticRatingTrialMaker(
@@ -434,7 +569,7 @@ if TIMELINE != "EXPERTISE":
         recruit_mode="n_participants",
         allow_repeated_nodes=False,
         balance_across_nodes=False,
-        n_repeat_trials=3
+        n_repeat_trials=3,
     )
 
 survey = ModularPage(
@@ -464,10 +599,10 @@ survey = ModularPage(
                             "isRequired": "true",
                         },
                     ],
-                }
+                },
             ],
             "headerView": "advanced",
-        }
+        },
     ),
     time_estimate=15,
     bot_response=lambda: {
@@ -500,7 +635,7 @@ def get_prolific_settings(experiment_duration):
 
 def get_cap_settings(experiment_duration):
     raise {
-        "wage_per_hour": 12
+        "wage_per_hour": 12,
     }
 
 
@@ -530,19 +665,28 @@ class Exp(psynet.experiment.Experiment):
         "wage_per_hour": 0,
         # "publish_experiment": False,
         "title": _(
-            "Pretty diagrams (Chrome browser, ~15 minutes to complete, ~2£)"),
+            "Pretty diagrams (Chrome browser, ~15 minutes to complete, ~2£)",
+        ),
 
-        "description": " ".join([
-            _("This experiment requires you to rate images (scientific diagrams) according to how pretty you find them."),
-            _("We recommend opening the experiment in an incognito window in Chrome, as some browser add-ons can interfere with the experiment."),
-            _("If you have any questions or concerns, please contact us through Prolific.")
-        ]),
+        "description": " ".join(
+            [
+                _(
+                    "This experiment requires you to rate images (scientific diagrams) according to how pretty you find them.",
+                ),
+                _(
+                    "We recommend opening the experiment in an incognito window in Chrome, as some browser add-ons can interfere with the experiment.",
+                ),
+                _(
+                    "If you have any questions or concerns, please contact us through Prolific.",
+                ),
+            ],
+        ),
 
         'initial_recruitment_size': 10,
         "auto_recruit": False,
         "show_reward": False,
         "contact_email_on_error": "lucas.gautheron@gmail.com",
-        "organization_name": "Max Planck Institute for Empirical Aesthetics"
+        "organization_name": "Max Planck Institute for Empirical Aesthetics",
     }
 
     if MODE != "HOTAIR":
@@ -553,13 +697,23 @@ class Exp(psynet.experiment.Experiment):
             NoConsent() if DEBUG else MainConsent(),
             BasicDemography(),
             survey,
+            CodeBlock(
+                lambda participant: participant.var.set(
+                    "z", Response.query.filter_by(
+                        question="survey", participant_id=participant.id,
+                    ).one().answer.get("expertise") in [
+                             "I am a computer scientist",
+                         ],
+                ),
+            ),
+
             InfoPage(
                 Markup(
                     f"<h3>Before we begin...</h3>"
                     f"<div style='margin: 10px;'>You will be presented with a series of diagrams. For each diagram, you will have to guess the title of the scientific publication from which they originate, among multiple choices.</div>"
                     f"<div style='margin: 10px;'>If you have no idea, you may say 'I don't know'. There is no reward or penalty for being right or wrong!</div>"
                     f"<div style='margin: 10px;'>If you make a guess, we will tell you whether you were correct or not.</div>"
-                    f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task1.png' width='480' /></div>"
+                    f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task1.png' width='480' /></div>",
                 ),
                 time_estimate=5,
             ),
@@ -578,7 +732,7 @@ class Exp(psynet.experiment.Experiment):
                     f"<div style='margin: 10px;'>Before we begin, let us try to assess your familiarity with the scientific domain in question very briefly!</div>"
                     f"<div style='margin: 10px;'>You will be presented with a series of diagrams. For each diagram, you will have to guess the title of the scientific publication from which they originate, among multiple choices.</div>"
                     f"<div style='margin: 10px;'>If you have no idea, you may say 'I don't know'. There is no reward or penalty for being right or wrong!</div>"
-                    f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task1.png' width='480' /></div>"
+                    f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task1.png' width='480' /></div>",
                 ),
                 time_estimate=5,
             ),
@@ -588,9 +742,9 @@ class Exp(psynet.experiment.Experiment):
                     f"<h3>Compare diagrams!</h3>"
                     f"<div style='margin: 10px;'>Fantastic, we can now start the aesthetic judgment task!</div>"
                     f"<div style='margin: 10px;'>You will be presented with a series of triplets of diagrams. For each triplet, you will have to pick the diagram that you find prettier.</div>"
-                    f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task2.png' width='480' /></div>"
+                    f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task2.png' width='480' /></div>",
                 ),
-                time_estimate=5
+                time_estimate=5,
             ),
             aesthetic_comparison_trial,
             InfoPage(
@@ -598,9 +752,9 @@ class Exp(psynet.experiment.Experiment):
                     f"<h3>Rate diagrams!</h3>"
                     "<div style='margin: 10px;'>Thank you! Let us finish with a slightly different task, assessing your aesthetic preferences in an other way.</div>"
                     f"<div style='margin: 10px;'>You will be presented with a series of diagrams. Rate each diagram from 0 (ugliest) to 10 (prettiest).</div>"
-                    f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task3.png' width='480' /></div>"
+                    f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task3.png' width='480' /></div>",
                 ),
-                time_estimate=5
+                time_estimate=5,
             ),
             aesthetic_rating_trial,
             SuccessfulEndPage(),
@@ -613,6 +767,8 @@ class Exp(psynet.experiment.Experiment):
         trials = bot.all_trials
 
         n_target_trials = N_EXPERTISE_TRIALS + N_TARGET_TRIPLETS_PER_PARTICIPANTS + N_TARGET_RATINGS_PER_PARTICIPANTS
-        assert len(trials) == n_target_trials, f"{len(trials)} != {n_target_trials}"
+        assert len(
+            trials,
+        ) == n_target_trials, f"{len(trials)} != {n_target_trials}"
         assert all([t.complete for t in trials])
         assert all([t.finalized for t in trials])
