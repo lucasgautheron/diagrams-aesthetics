@@ -55,7 +55,7 @@ def get_s3_url(stimulus):
     return f"https://{S3_BUCKET}.s3.amazonaws.com/{S3_KEY}/{stimulus}"
 
 
-DEBUG = False
+DEBUG = True
 MODE = "HOTAIR"
 
 TIMELINE = "AESTHETIC"
@@ -69,12 +69,12 @@ else:
     N_EXPERTISE_TRIALS = 3
     N_EXPERTISE_NODES = 50
 
-N_TARGET_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 150
-N_MAX_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 150
+N_TARGET_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 100
+N_MAX_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 100
 N_TRIALS_PER_TRIPLET = 5
 
-N_TARGET_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 75
-N_MAX_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 75
+N_TARGET_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 50
+N_MAX_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 50
 N_TRIALS_PER_RATING = 5
 
 
@@ -489,7 +489,7 @@ class RateTrial(StaticTrial):
                 height=350,
             ),
             SliderControl(
-                start_value=3,
+                start_value=4,
                 min_value=1,
                 max_value=7,
                 snap_values=np.arange(1,7+1).tolist(),
@@ -558,7 +558,7 @@ if TIMELINE != "EXPERTISE":
         recruit_mode="n_participants",
         allow_repeated_nodes=False,
         balance_across_nodes=False,
-        n_repeat_trials=3,
+        n_repeat_trials=2,
     )
 
     aesthetic_rating_trial = AestheticRatingTrialMaker(
@@ -571,7 +571,7 @@ if TIMELINE != "EXPERTISE":
         recruit_mode="n_participants",
         allow_repeated_nodes=False,
         balance_across_nodes=False,
-        n_repeat_trials=3,
+        n_repeat_trials=2,
     )
 
 survey = ModularPage(
@@ -593,6 +593,18 @@ survey = ModularPage(
                                 "I have a college degree in another field",
                                 "I do not have a college degree",
                             ],
+                        },
+                        {
+                            "type": "boolean",
+                            "name": "scientist",
+                            "title": "Are you a scientist (e.g., working in academia, research institute, or industry)?",
+                            "isRequired": "true",
+                        },
+                        {
+                            "type": "boolean",
+                            "name": "latex",
+                            "title": "Are you a user of LaTeX, a typesetting language often used by researchers to write scientific documents?",
+                            "isRequired": "true",
                         },
                         {
                             "type": "boolean",
