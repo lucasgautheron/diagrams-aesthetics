@@ -14,7 +14,7 @@ from psynet.modular_page import (
     HtmlSliderControl,
 )
 
-from psynet.timeline import Timeline, CodeBlock, ModuleState, Response
+from psynet.timeline import Timeline, CodeBlock, ModuleState, Response, Event
 from psynet.participant import Participant
 from psynet.trial.chain import ChainNode
 
@@ -58,7 +58,7 @@ def get_s3_url(stimulus):
 DEBUG = False
 MODE = "HOTAIR"
 
-TIMELINE = "EXPERTISE"
+TIMELINE = "AESTHETIC"
 
 if TIMELINE == "EXPERTISE":
     DURATION_ESTIMATE = 15 * 60
@@ -438,8 +438,8 @@ class CompareTrial(StaticTrial):
 class AestheticComparisonTrialMaker(StaticTrialMaker):
     def __init__(self, *args, **kwargs):
         triplets_locations = [
-            "static/tasks/clip-random.csv",
-            "static/tasks/random.csv",
+            "static/tasks/comparison-clusters-1.csv",
+            "static/tasks/comparison-random-1.csv",
         ]
 
         nodes = []
@@ -450,7 +450,7 @@ class AestheticComparisonTrialMaker(StaticTrialMaker):
             nodes += [
                 StaticNode(
                     definition={
-                        "id": task["image"],
+                        "id": "_".join([task["hash0"], task["hash1"], task["hash2"]]),
                         "hashes": [task["hash0"], task["hash1"], task["hash2"]],
                     },
                     assets={
@@ -726,6 +726,15 @@ class Exp(psynet.experiment.Experiment):
             NoConsent() if DEBUG else MainConsent(),
             BasicDemography(),
             survey,
+            CodeBlock(
+                lambda participant: participant.var.set(
+                    "z", Response.query.filter_by(
+                        question="survey", participant_id=participant.id,
+                    ).one().answer.get("expertise") in [
+                             "I am a computer scientist",
+                         ],
+                ),
+            ),
             InfoPage(
                 Markup(
                     f"<h3>Before we begin...</h3>"
