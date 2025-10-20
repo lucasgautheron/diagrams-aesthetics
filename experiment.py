@@ -489,13 +489,15 @@ class RateTrial(StaticTrial):
                 height=350,
             ),
             SliderControl(
-                start_value=5,
-                min_value=0,
-                max_value=10,
+                start_value=3,
+                min_value=1,
+                max_value=7,
+                snap_values=np.arange(1,7+1).tolist(),
+                n_steps=7,
                 slider_id="slider",
                 template_filename="slider_value.html",
             ),
-            bot_response=np.random.uniform(0, 10),
+            bot_response=np.random.randint(1, 7+1),
         )
 
 
@@ -587,9 +589,9 @@ survey = ModularPage(
                             "title": "Which of these best describes you?",
                             "isRequired": "true",
                             "choices": [
-                                "I am a computer scientist",
-                                "I am a scientist, but in another STEM field",
-                                "I am not a scientist",
+                                "I have a college degree in Science, Technology, Engineering, or Mathematics (STEM)",
+                                "I have a college degree in another field",
+                                "I do not have a college degree",
                             ],
                         },
                         {
@@ -702,11 +704,10 @@ class Exp(psynet.experiment.Experiment):
                     "z", Response.query.filter_by(
                         question="survey", participant_id=participant.id,
                     ).one().answer.get("expertise") in [
-                             "I am a computer scientist",
-                         ],
+                        "I have a college degree in Science, Technology, Engineering, or Mathematics (STEM)",
+                    ],
                 ),
             ),
-
             InfoPage(
                 Markup(
                     f"<h3>Before we begin...</h3>"
@@ -731,8 +732,8 @@ class Exp(psynet.experiment.Experiment):
                     "z", Response.query.filter_by(
                         question="survey", participant_id=participant.id,
                     ).one().answer.get("expertise") in [
-                             "I am a computer scientist",
-                         ],
+                        "I have a college degree in Science, Technology, Engineering, or Mathematics (STEM)",
+                    ],
                 ),
             ),
             InfoPage(
