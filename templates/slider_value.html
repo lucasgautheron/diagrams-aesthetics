@@ -1,7 +1,7 @@
 <!-- Value display above the slider -->
 <div id="slider-value-display"
      style="text-align: center; margin: 10px 0; font-size: 18px; font-weight: bold; color: #333;">
-    Rating: <span id="current-value">{{ params.start_value }}</span>
+    Rating: <span id="current-value">{{ params.start_value }}</span> / {{ params.max_value }}
 </div>
 
 <script>
@@ -207,7 +207,7 @@
             updateSliderValue();
             setupDirectListeners();
             hookExistingFunctions();
-            addSliderLabels('{{ params.slider_id }}', 'Very ugly', 'Very pretty');
+            addSliderLabels('{{ params.slider_id }}', 'Very ugly\n(1/7)', 'Very pretty\n(7/7)');
 
         });
     }
