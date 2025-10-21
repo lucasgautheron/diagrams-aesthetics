@@ -591,6 +591,10 @@ class AestheticRatingTrialMaker(StaticTrialMaker):
             # All hashes in triplet are available
         ]
 
+        if len(completable_triplets) <= n_completed_triplets:
+            logger.info("No more completable triplets, return all networks.")
+            return networks
+
         logger.info(f"Triplets before filtering: {len(compare_hashes)}")
         logger.info(f"Triplets after filtering: {len(completable_triplets)}")
 
