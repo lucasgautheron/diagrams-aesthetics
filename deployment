@@ -1,0 +1,4 @@
+dallinger ec2 provision --name lucas-diagrams --region us-east-1 --type m7i.xlarge --dns-host lucas1.cap-experiments.com
+psynet deploy ssh --app lucas-diagrams --dns-host lucas1.cap-experiments.com --server lucas1.cap-experiments.com
+
+psynet ssh --app lucas-diagrams test --n-bots 8 --parallel
