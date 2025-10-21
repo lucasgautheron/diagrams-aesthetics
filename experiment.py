@@ -62,13 +62,11 @@ MODE = "HOTAIR"
 TIMELINE = "AESTHETIC"
 
 if TIMELINE == "EXPERTISE":
-    DURATION_ESTIMATE = 15 * 60
     N_EXPERTISE_TRIALS = 30
     N_EXPERTISE_NODES = 60
 else:
-    DURATION_ESTIMATE = 15 * 60
     N_EXPERTISE_TRIALS = 3
-    N_EXPERTISE_NODES = 50
+    N_EXPERTISE_NODES = 20
 
 N_TARGET_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 80
 N_MAX_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 80
@@ -79,6 +77,8 @@ N_MAX_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 40
 N_TRIALS_PER_RATING = 5
 
 N_REPEAT_TRIALS = 2
+
+DURATION_ESTIMATE = 60 + N_EXPERTISE_TRIALS*60 + N_TARGET_TRIPLETS_PER_PARTICIPANTS*11 + N_TARGET_RATINGS_PER_PARTICIPANTS*11
 
 
 class ActiveInference:
@@ -500,6 +500,8 @@ class RateTrial(StaticTrial):
                 n_steps=7,
                 slider_id="slider",
                 template_filename="slider_value.html",
+                minimal_time=3,
+                minimal_interactions=0
             ),
             bot_response=np.random.randint(1, 7 + 1),
         )
@@ -815,9 +817,9 @@ class Exp(psynet.experiment.Experiment):
     else:
         timeline = Timeline(
             NoConsent() if DEBUG else MainConsent(),
-            # Age(),
-            # Gender(),
-            # FormalEducation(),
+            Age(),
+            Gender(),
+            FormalEducation(),
             survey,
             CodeBlock(
                 lambda participant: participant.var.set(
