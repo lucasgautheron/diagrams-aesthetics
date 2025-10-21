@@ -11,7 +11,6 @@ from psynet.modular_page import (
     DropdownControl,
     SurveyJSControl,
     SliderControl,
-    HtmlSliderControl,
 )
 
 from psynet.timeline import Timeline, CodeBlock, ModuleState, Response, Event
@@ -47,8 +46,8 @@ import csv
 
 from typing import List, Union, Optional
 
-S3_BUCKET = "lucasgautheron"
-S3_KEY = "diagrams-aesthetics"
+S3_BUCKET = "cap-lucasgautheron"
+S3_KEY = "diagrams-aesthetics/tasks"
 
 
 def get_s3_url(stimulus):
@@ -76,6 +75,8 @@ N_TRIALS_PER_TRIPLET = 5
 N_TARGET_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 50
 N_MAX_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 50
 N_TRIALS_PER_RATING = 5
+
+N_REPEAT_TRIALS = 2
 
 
 class ActiveInference:
@@ -179,7 +180,7 @@ class ExpertiseNode(ChainNode):
 
 
 class ExpertiseTrial(StaticTrial):
-    time_estimate = 60
+    time_estimate = 30
 
     @declared_attr
     def y(cls):
@@ -403,7 +404,7 @@ class AestheticComparisonPrompt(Prompt):
 
 
 class CompareTrial(StaticTrial):
-    time_estimate = 3
+    time_estimate = 10
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -439,7 +440,7 @@ class AestheticComparisonTrialMaker(StaticTrialMaker):
     def __init__(self, *args, **kwargs):
         triplets_locations = [
             "static/tasks/comparison-clusters-1.csv",
-            "static/tasks/comparison-random-1.csv",
+            "static/tasks/comparison-random-2.csv",
         ]
 
         nodes = []
@@ -450,7 +451,9 @@ class AestheticComparisonTrialMaker(StaticTrialMaker):
             nodes += [
                 StaticNode(
                     definition={
-                        "id": "_".join([task["hash0"], task["hash1"], task["hash2"]]),
+                        "id": "_".join(
+                            [task["hash0"], task["hash1"], task["hash2"]],
+                        ),
                         "hashes": [task["hash0"], task["hash1"], task["hash2"]],
                     },
                     assets={
@@ -461,19 +464,18 @@ class AestheticComparisonTrialMaker(StaticTrialMaker):
                         for hash in
                         [task["hash0"], task["hash1"], task["hash2"]]
                     },
-                    block=f"{block}",
                 )
                 for task in tasks.to_dict(orient="records")
             ]
 
         super().__init__(*args, **kwargs, nodes=nodes)
 
-    def choose_block_order(self, experiment, participant, blocks):
-        return sorted(blocks)
+    # def choose_block_order(self, experiment, participant, blocks):
+    #     return sorted(blocks)
 
 
 class RateTrial(StaticTrial):
-    time_estimate = 3
+    time_estimate = 10
 
     def show_trial(self, experiment, participant):
         asset = self.assets["stimulus"]
@@ -492,18 +494,18 @@ class RateTrial(StaticTrial):
                 start_value=4,
                 min_value=1,
                 max_value=7,
-                snap_values=np.arange(1,7+1).tolist(),
+                snap_values=np.arange(1, 7 + 1).tolist(),
                 n_steps=7,
                 slider_id="slider",
                 template_filename="slider_value.html",
             ),
-            bot_response=np.random.randint(1, 7+1),
+            bot_response=np.random.randint(1, 7 + 1),
         )
 
 
 class AestheticRatingTrialMaker(StaticTrialMaker):
     def __init__(self, *args, **kwargs):
-        tasks_metadata = ["static/tasks/rating1.csv"]
+        tasks_metadata = ["static/tasks/rating-1.csv"]
 
         nodes = []
         for block, location in enumerate(tasks_metadata):
@@ -513,12 +515,14 @@ class AestheticRatingTrialMaker(StaticTrialMaker):
             nodes += [
                 StaticNode(
                     definition={
-                        "id": basename(task["hash"]),
-                        "hash": task["hash"],
+                        "id": basename(task["hash0"]),
+                        "hash": task["hash0"],
                     },
                     assets={
                         "stimulus": asset(
-                            get_s3_url(f"{images_location}/{task['hash']}.png"),
+                            get_s3_url(
+                                f"{images_location}/{task['hash0']}.png",
+                            ),
                             cache=True,
                         ),
                     },
@@ -528,9 +532,9 @@ class AestheticRatingTrialMaker(StaticTrialMaker):
             ]
 
         super().__init__(*args, **kwargs, nodes=nodes)
-
-    def choose_block_order(self, experiment, participant, blocks):
-        return sorted(blocks)
+    #
+    # def choose_block_order(self, experiment, participant, blocks):
+    #     return sorted(blocks)
 
 
 expertise_trial = ExpertiseTrialMaker(
@@ -558,7 +562,7 @@ if TIMELINE != "EXPERTISE":
         recruit_mode="n_participants",
         allow_repeated_nodes=False,
         balance_across_nodes=False,
-        n_repeat_trials=2,
+        n_repeat_trials=N_REPEAT_TRIALS,
     )
 
     aesthetic_rating_trial = AestheticRatingTrialMaker(
@@ -571,7 +575,7 @@ if TIMELINE != "EXPERTISE":
         recruit_mode="n_participants",
         allow_repeated_nodes=False,
         balance_across_nodes=False,
-        n_repeat_trials=2,
+        n_repeat_trials=N_REPEAT_TRIALS,
     )
 
 survey = ModularPage(
@@ -606,19 +610,13 @@ survey = ModularPage(
                             "title": "Are you a user of LaTeX, a typesetting language often used by researchers to write scientific documents?",
                             "isRequired": "true",
                         },
-                        {
-                            "type": "boolean",
-                            "name": "tikz",
-                            "title": "Are you a user of TikZ, a programming language primarily used by scientists to produce scientific diagrams?",
-                            "isRequired": "true",
-                        },
                     ],
                 },
             ],
             "headerView": "advanced",
         },
     ),
-    time_estimate=15,
+    time_estimate=30,
     bot_response=lambda: {
         "expertise": "I am not a scientist",
         "education": "BA/BSc",
@@ -637,12 +635,12 @@ def get_prolific_settings(experiment_duration):
 
     return {
         "recruiter": "prolific",
-        "base_payment": 9 * DURATION_ESTIMATE / 60 / 60,
+        "base_payment": 0,
         "prolific_estimated_completion_minutes": DURATION_ESTIMATE / 60,
         "prolific_recruitment_config": qualification,
         "auto_recruit": False,
-        "wage_per_hour": 0,
-        "currency": "£",
+        "wage_per_hour": 9,
+        "currency": "$",
         "show_reward": False,
     }
 
@@ -670,9 +668,8 @@ elif MODE == "CAP":
 
 class Exp(psynet.experiment.Experiment):
     label = "Pretty diagrams"
-    # asset_storage = LocalStorage()
-    # asset_storage = LocalStorage    # asset_storage = LocalStorage("assets")("assets")
-    asset_storage = S3Storage("lucasgautheron", "diagrams-aesthetics")
+    asset_storage = S3Storage(S3_BUCKET, S3_KEY)
+    test_n_bots = 10
 
     config = {
         "recruiter": recruiters[MODE],
@@ -716,8 +713,8 @@ class Exp(psynet.experiment.Experiment):
                     "z", Response.query.filter_by(
                         question="survey", participant_id=participant.id,
                     ).one().answer.get("expertise") in [
-                        "I have a college degree in Science, Technology, Engineering, or Mathematics (STEM)",
-                    ],
+                             "I have a college degree in Science, Technology, Engineering, or Mathematics (STEM)",
+                         ],
                 ),
             ),
             InfoPage(
@@ -744,8 +741,8 @@ class Exp(psynet.experiment.Experiment):
                     "z", Response.query.filter_by(
                         question="survey", participant_id=participant.id,
                     ).one().answer.get("expertise") in [
-                        "I have a college degree in Science, Technology, Engineering, or Mathematics (STEM)",
-                    ],
+                             "I have a college degree in Science, Technology, Engineering, or Mathematics (STEM)",
+                         ],
                 ),
             ),
             InfoPage(
@@ -773,7 +770,7 @@ class Exp(psynet.experiment.Experiment):
                 Markup(
                     f"<h3>Rate diagrams!</h3>"
                     "<div style='margin: 10px;'>Thank you! Let us finish with a slightly different task, assessing your aesthetic preferences in an other way.</div>"
-                    f"<div style='margin: 10px;'>You will be presented with a series of diagrams. Rate each diagram from 0 (ugliest) to 10 (prettiest).</div>"
+                    f"<div style='margin: 10px;'>You will be presented with a series of diagrams. Rate each diagram from 1 (ugliest) to 7 (prettiest).</div>"
                     f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task3.png' width='480' /></div>",
                 ),
                 time_estimate=5,
@@ -782,13 +779,11 @@ class Exp(psynet.experiment.Experiment):
             SuccessfulEndPage(),
         )
 
-    test_n_bots = 10
-
     def test_check_bot(self, bot: Bot, **kwargs):
         assert not bot.failed
         trials = bot.all_trials
 
-        n_target_trials = N_EXPERTISE_TRIALS + N_TARGET_TRIPLETS_PER_PARTICIPANTS + N_TARGET_RATINGS_PER_PARTICIPANTS
+        n_target_trials = N_EXPERTISE_TRIALS + N_TARGET_TRIPLETS_PER_PARTICIPANTS + N_TARGET_RATINGS_PER_PARTICIPANTS + 2 * N_REPEAT_TRIALS
         assert len(
             trials,
         ) == n_target_trials, f"{len(trials)} != {n_target_trials}"
