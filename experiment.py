@@ -500,7 +500,7 @@ class RateTrial(StaticTrial):
                 n_steps=7,
                 slider_id="slider",
                 template_filename="slider_value.html",
-                minimal_time=3,
+                minimal_time=2,
                 minimal_interactions=0
             ),
             bot_response=np.random.randint(1, 7 + 1),
@@ -716,11 +716,11 @@ def get_prolific_settings(experiment_duration):
 
     return {
         "recruiter": "prolific",
-        "base_payment": 0,
+        "base_payment": 9 * DURATION_ESTIMATE / 3600,
         "prolific_estimated_completion_minutes": DURATION_ESTIMATE / 60,
         "prolific_recruitment_config": qualification,
         "auto_recruit": False,
-        "wage_per_hour": 9,
+        "wage_per_hour": 0,
         "currency": "$",
         "show_reward": False,
     }
@@ -757,13 +757,13 @@ class Exp(psynet.experiment.Experiment):
         "wage_per_hour": 0,
         # "publish_experiment": False,
         "title": _(
-            "Pretty diagrams (Chrome browser, ~15 minutes to complete, ~2£)",
+            "Pretty diagrams (Chrome browser, ~25 minutes to complete, ~3.6$)",
         ),
 
         "description": " ".join(
             [
                 _(
-                    "This experiment requires you to rate images (scientific diagrams) according to how pretty you find them.",
+                    "This experiment requires you to assess the visual appeal of several images (scientific diagrams).",
                 ),
                 _(
                     "We recommend opening the experiment in an incognito window in Chrome, as some browser add-ons can interfere with the experiment.",
@@ -774,7 +774,7 @@ class Exp(psynet.experiment.Experiment):
             ],
         ),
 
-        'initial_recruitment_size': 10,
+        'initial_recruitment_size': 3,
         "auto_recruit": False,
         "show_reward": False,
         "contact_email_on_error": "lucas.gautheron@gmail.com",
@@ -787,7 +787,6 @@ class Exp(psynet.experiment.Experiment):
     if TIMELINE == "EXPERTISE":
         timeline = Timeline(
             NoConsent() if DEBUG else MainConsent(),
-            Age(),
             Gender(),
             FormalEducation(),
             survey,
@@ -803,8 +802,8 @@ class Exp(psynet.experiment.Experiment):
             InfoPage(
                 Markup(
                     f"<h3>Before we begin...</h3>"
-                    f"<div style='margin: 10px;'>You will be presented with a series of diagrams. For each diagram, you will have to guess the title of the scientific publication from which they originate, among multiple choices.</div>"
-                    f"<div style='margin: 10px;'>If you have no idea, you may say 'I don't know'. There is no reward or penalty for being right or wrong!</div>"
+                    f"<div style='margin: 10px;'>You will be shown a series of diagrams. For each diagram, you will have to guess the title of the scientific publication from which they originate, among multiple choices.</div>"
+                    f"<div style='margin: 10px;'>If you have no idea, please say 'I don't know'. There is no reward or penalty for being right or wrong!</div>"
                     f"<div style='margin: 10px;'>If you make a guess, we will tell you whether you were correct or not.</div>"
                     f"<div style='border: 2px black; margin: 10px;'><img src='/static/images/task1.png' width='480' /></div>",
                 ),
@@ -817,7 +816,6 @@ class Exp(psynet.experiment.Experiment):
     else:
         timeline = Timeline(
             NoConsent() if DEBUG else MainConsent(),
-            Age(),
             Gender(),
             FormalEducation(),
             survey,
