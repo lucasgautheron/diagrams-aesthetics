@@ -1,7 +1,7 @@
 import psynet.experiment
 from psynet.bot import Bot
 from psynet.demography.general import (
-    Gender, Age, FormalEducation
+    Gender, Age, FormalEducation,
 )
 from psynet.modular_page import (
     ModularPage,
@@ -46,13 +46,15 @@ import csv
 
 from typing import List, Union, Optional
 
+from psynet.utils import get_logger
+
 S3_BUCKET = "cap-lucasgautheron"
 S3_KEY = "diagrams-aesthetics/tasks"
-
 
 def get_s3_url(stimulus):
     return f"https://{S3_BUCKET}.s3.amazonaws.com/{S3_KEY}/{stimulus}"
 
+logger = get_logger()
 
 DEBUG = False
 MODE = "HOTAIR"
@@ -509,7 +511,7 @@ class AestheticRatingTrialMaker(StaticTrialMaker):
 
         nodes = []
         for block, location in enumerate(tasks_metadata):
-            tasks = pd.read_csv(location).to_dict(orient="records")
+            tasks = pd.read_csv(location).drop_duplicates("hash0").to_dict(orient="records")
             images_location = splitext(basename(location))[0]
 
             nodes += [
@@ -532,9 +534,79 @@ class AestheticRatingTrialMaker(StaticTrialMaker):
             ]
 
         super().__init__(*args, **kwargs, nodes=nodes)
+
     #
     # def choose_block_order(self, experiment, participant, blocks):
     #     return sorted(blocks)
+
+    def prioritize_networks(self, networks, participant, experiment):
+        rate_trials = self.trial_class.query.filter_by(
+            participant_id=participant.id, finalized=True
+        ).all()
+
+        rate_hashes = []
+        for trial in rate_trials:
+            rate_hashes.append(trial.definition["hash"])
+        rate_hashes = set(rate_hashes)
+
+        remaining_hashes = set([network.head.definition["hash"] for network in networks])
+        assert len(remaining_hashes&rate_hashes) == 0
+        available_hashes = remaining_hashes | rate_hashes
+
+        compare_trials = aesthetic_comparison_trial.trial_class.query.filter_by(
+            participant_id=participant.id, failed=False, finalized=True,
+        )
+        compare_hashes = []
+        all_compare_hashes = set()
+        n_completed_triplets = 0
+        for trial in compare_trials:
+            hashes = set(trial.definition["hashes"])
+            compare_hashes.append(hashes)
+            all_compare_hashes |= hashes
+            if len(hashes&rate_hashes) == len(hashes):
+                n_completed_triplets += 1
+
+        logger.info(all_compare_hashes)
+
+        logger.info(f"Number of completed triplets: {n_completed_triplets}")
+
+        logger.info("RateTrial networks before filtering:")
+        logger.info(len(networks))
+        filtered_networks = [
+            network for network in networks
+            if network.head.definition["hash"] in all_compare_hashes
+        ]
+        logger.info("RateTrial networks after filtering:")
+        logger.info(len(filtered_networks))
+
+        if len(filtered_networks) == 0:
+            return filtered_networks
+
+        completable_triplets = [
+            triplet for triplet in compare_hashes
+            if len(triplet - available_hashes) == 0
+            # All hashes in triplet are available
+        ]
+
+        logger.info(f"Triplets before filtering: {len(compare_hashes)}")
+        logger.info(f"Triplets after filtering: {len(completable_triplets)}")
+
+        return sorted(
+            filtered_networks,
+            key=lambda network: (
+                max(
+                    [
+                        # Score higher when we'd complete or nearly complete a triplet
+                        len(triplet & rate_hashes)
+                        if network.head.definition["hash"] in triplet and
+                           network.head.definition["hash"] not in rate_hashes
+                        else -1
+                        for triplet in completable_triplets
+                    ]
+                ) if len(completable_triplets) > 0 else -1
+            ),
+            reverse=True,
+        )
 
 
 expertise_trial = ExpertiseTrialMaker(
@@ -736,9 +808,9 @@ class Exp(psynet.experiment.Experiment):
     else:
         timeline = Timeline(
             NoConsent() if DEBUG else MainConsent(),
-            Age(),
-            Gender(),
-            FormalEducation(),
+            # Age(),
+            # Gender(),
+            # FormalEducation(),
             survey,
             CodeBlock(
                 lambda participant: participant.var.set(
