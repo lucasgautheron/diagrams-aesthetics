@@ -544,6 +544,9 @@ class AestheticRatingTrialMaker(StaticTrialMaker):
             participant_id=participant.id, finalized=True
         ).all()
 
+        if len(rate_trials) < N_TARGET_RATINGS_PER_PARTICIPANTS // 2:
+            return networks
+
         rate_hashes = []
         for trial in rate_trials:
             rate_hashes.append(trial.definition["hash"])
