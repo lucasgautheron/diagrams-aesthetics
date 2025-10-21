@@ -4,7 +4,7 @@
 #
 #    dallinger generate-constraints
 #
-# Compiled from a requirement.txt file with md5sum: 2c9ea12b0a9d925bb9d84e1edba90db6
+# Compiled from a requirement.txt file with md5sum: dadf2d981b6bcd7b49c5f2703287149b
 #
 ansi2html==1.9.2
     # via
@@ -85,9 +85,9 @@ cryptography==45.0.2
     #   -c https://raw.githubusercontent.com/Dallinger/Dallinger/v11.3.2/dev-requirements.txt
     #   paramiko
     #   pyopenssl
-dallinger[docker]==11.2.0
+dallinger[docker]==11.3.2
     # via
-    #   -r /var/folders/n_/1jsh_4z951n2wf4_2t22fqxm0000gn/T/tmpnidq085_/requirements.txt
+    #   -r /var/folders/n_/1jsh_4z951n2wf4_2t22fqxm0000gn/T/tmph_dofsdt/requirements.txt
     #   psynet
 decorator==5.2.1
     # via
@@ -273,7 +273,7 @@ psycopg2==2.9.10
     #   -c https://raw.githubusercontent.com/Dallinger/Dallinger/v11.3.2/dev-requirements.txt
     #   dallinger
     #   sqlalchemy-postgres-copy
-psynet @ git+https://gitlab.com/PsyNetDev/PsyNet@v12.0.2
+psynet @ git+https://gitlab.com/PsyNetDev/PsyNet@v12.1.1
     # via -r requirements.txt
 ptyprocess==0.7.0
     # via
@@ -316,7 +316,10 @@ pytest==8.3.5
     # via
     #   -c https://raw.githubusercontent.com/Dallinger/Dallinger/v11.3.2/dev-requirements.txt
     #   psynet
+    #   pytest-dependency
     #   pytest-mock
+pytest-dependency==0.6.0
+    # via psynet
 pytest-mock==3.15.1
     # via psynet
 python-dateutil==2.9.0.post0
