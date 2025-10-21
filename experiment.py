@@ -1,7 +1,7 @@
 import psynet.experiment
 from psynet.bot import Bot
 from psynet.demography.general import (
-    BasicDemography,
+    Gender, Age, FormalEducation
 )
 from psynet.modular_page import (
     ModularPage,
@@ -54,7 +54,7 @@ def get_s3_url(stimulus):
     return f"https://{S3_BUCKET}.s3.amazonaws.com/{S3_KEY}/{stimulus}"
 
 
-DEBUG = True
+DEBUG = False
 MODE = "HOTAIR"
 
 TIMELINE = "AESTHETIC"
@@ -68,12 +68,12 @@ else:
     N_EXPERTISE_TRIALS = 3
     N_EXPERTISE_NODES = 50
 
-N_TARGET_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 100
-N_MAX_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 100
+N_TARGET_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 80
+N_MAX_TRIPLETS_PER_PARTICIPANTS = 15 if DEBUG else 80
 N_TRIALS_PER_TRIPLET = 5
 
-N_TARGET_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 50
-N_MAX_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 50
+N_TARGET_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 40
+N_MAX_RATINGS_PER_PARTICIPANTS = 5 if DEBUG else 40
 N_TRIALS_PER_RATING = 5
 
 N_REPEAT_TRIALS = 2
@@ -706,7 +706,9 @@ class Exp(psynet.experiment.Experiment):
     if TIMELINE == "EXPERTISE":
         timeline = Timeline(
             NoConsent() if DEBUG else MainConsent(),
-            BasicDemography(),
+            Age(),
+            Gender(),
+            FormalEducation(),
             survey,
             CodeBlock(
                 lambda participant: participant.var.set(
@@ -734,7 +736,9 @@ class Exp(psynet.experiment.Experiment):
     else:
         timeline = Timeline(
             NoConsent() if DEBUG else MainConsent(),
-            BasicDemography(),
+            Age(),
+            Gender(),
+            FormalEducation(),
             survey,
             CodeBlock(
                 lambda participant: participant.var.set(
